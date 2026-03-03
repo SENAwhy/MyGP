@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AIOps 监控大屏</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
@@ -50,10 +51,12 @@
                         alert("获取失败！请确认你的 Python uvicorn 服务器还在运行吗？");
                     }
                 }
+                // 让网页每隔 2 秒（2000毫秒），自动帮你执行一次获取数据的动作
+                setInterval(getData, 2000);
 
                 return { cpu, memory, getData }
             }
-        }).mount('#app') // 挂载完毕！
+        }).mount('#app') // 挂载完毕
     </script>
 </body>
 </html>
