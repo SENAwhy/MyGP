@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>AIOps 监控大屏</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body { background-color: #121212; color: #00ffcc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; padding-top: 100px; }
+        .card { background: #1e1e1e; border: 1px solid #333; padding: 30px; border-radius: 12px; width: 350px; text-align: center; box-shadow: 0 0 20px rgba(0, 255, 204, 0.2); }
+        .data-text { font-size: 28px; font-weight: bold; color: #fff; margin: 15px 0; }
+        button { background: #00ffcc; color: #121212; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 20px; transition: 0.3s; }
+        button:hover { background: #00ccaa; box-shadow: 0 0 10px #00ffcc; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="card">
+            <h2>🚀 核心服务器状态</h2>
+            
+            <div>CPU 使用率: <div class="data-text">{{ cpu }} %</div></div>
+            <div>内存 使用率: <div class="data-text">{{ memory }} %</div></div>
+            
+            <button @click="getData">📡 获取最新状态</button>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref } = Vue
+
+        createApp({
+            setup() {
+                // 定义两个响应式变量，初始值为 0
+                const cpu = ref(0)
+                const memory = ref(0)
+
+                // 核心：去敲 Python 后端门的方法
+                const getData = async () => {
+                    try {
+                        // 1. 发起网络请求
+                        const response = await fetch('http://127.0.0.1:8000/api/system_status');
+                        // 2. 解析 JSON 数据
+                        const result = await response.json();
+                        
+                        // 3. 将后端传来的数据，赋值给前端的变量
+                        if (result.status === 'success') {
+                            cpu.value = result.cpu_usage;
+                            memory.value = result.memory_usage;
+                        }
+                    } catch (error) {
+                        alert("获取失败！请确认你的 Python uvicorn 服务器还在运行吗？");
+                    }
+                }
+
+                return { cpu, memory, getData }
+            }
+        }).mount('#app') // 挂载完毕！
+    </script>
+</body>
+</html>
