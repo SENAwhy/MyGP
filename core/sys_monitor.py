@@ -53,11 +53,20 @@ def get_system_data():
 
     # 获取CPU和进程
     cpu_usage = psutil.cpu_percent(interval=None)
+    # core/sys_monitor.py 里的进程抓取部分
     processes = []
-    for p in psutil.process_iter(['pid', 'name', 'cpu_percent']):
+    for p in psutil.process_iter(['pid', 'name', 'cpu_percent', 'exe', 'memory_info']):
         try:
             if p.info['pid'] > 4: 
-                processes.append(p.info)
+                # 计算内存占用（转成 MB）
+                mem_mb = p.info['memory_info'].rss / 1024 / 1024
+                processes.append({
+                    "pid": p.info['pid'],
+                    "name": p.info['name'],
+                    "cpu_percent": p.info['cpu_percent'],
+                    "path": p.info['exe'] or "未知路径", #  新增路径
+                    "memory_mb": round(mem_mb, 2)       # 新增精确内存
+                })
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
             
@@ -77,3 +86,5 @@ def get_system_data():
     save_to_csv(result_data)
 
     return result_data
+
+

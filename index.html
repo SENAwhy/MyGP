@@ -15,13 +15,20 @@
         .alert-text { color: #ff4757 !important; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
 
-        .header { border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 20px; text-align: center;}
+        .header { border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 10px; text-align: center;}
+        
+        /* 💻 新增：系统静态信息条样式 */
+        .sys-info-bar { display: flex; justify-content: space-around; background: #00ffcc11; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; color: #00ffcc; border: 1px solid #00ffcc33;}
+        
         .number-board { display: flex; justify-content: space-around; margin-bottom: 20px; background: #2f3542; padding: 15px; border-radius: 8px;}
         .data-text { font-size: 28px; font-weight: bold; color: #00ffcc; text-align: center; margin-top: 5px;}
         
         #chart-container { width: 100%; height: 250px; margin-bottom: 20px; }
         .process-list { background: #2f3542; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px;}
-        .process-item { display: flex; justify-content: space-between; border-bottom: 1px dashed #555; padding: 8px 0; }
+        
+        /* 🚀 优化：进程条加入鼠标悬停效果 */
+        .process-item { display: flex; justify-content: space-between; border-bottom: 1px dashed #555; padding: 10px 0; cursor: pointer; transition: 0.2s;}
+        .process-item:hover { background: #3d4451; padding-left: 5px; border-radius: 4px;}
         
         button { border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.3s; width: 100%; background: #ff4757; color: white; }
         button:hover { background: #ff6b81; }
@@ -37,6 +44,12 @@
                     {{ isAlert ? '🚨 警告：服务器负载过高！' : '🚀 AIOps 智能监控中枢 (Max版)' }}
                 </h2>
             </div>
+
+            <div class="sys-info-bar">
+                <span>💻 主机: {{ hostname }}</span>
+                <span>🌐 IP: {{ localIp }}</span>
+                <span>💽 磁盘: {{ diskPercent }}%</span>
+            </div>
             
             <div class="number-board">
                 <div>CPU 负载<div class="data-text" :class="{'alert-text': cpu > 80}">{{ cpu }} %</div></div>
@@ -48,18 +61,18 @@
             <div id="chart-container"></div>
 
             <div class="process-list">
-                <strong style="color: #ced6e0;">🔥 真实高耗能进程 Top 3 (已过滤系统空闲)：</strong>
-                <div class="process-item" v-for="(p, index) in topProcs" :key="index">
+                <strong style="color: #ced6e0;">🔥 实时高能耗进程 (点击查看路径)：</strong>
+                <div class="process-item" v-for="(p, index) in topProcs" :key="index" @click="showDetail(p)">
                     <span>🥇 NO.{{ index + 1 }} | {{ p.name }} (PID: {{ p.pid }})</span>
                     <span style="color: #ff4757; font-weight: bold;">{{ p.cpu_percent }}%</span>
                 </div>
             </div>
             
             <button @click="getAIReport" :disabled="isDiagnosing">
-                {{ isDiagnosing ? ' DeepSeek 分析中...' : '🚨 异常发生？一键生成 AI 根因报告' }}
+                {{ isDiagnosing ? ' DeepSeek 正在深度诊断中...' : '🚨 异常发生？一键生成 AI 根因报告' }}
             </button>
             <div v-if="reportData" class="report-box">
-                <strong style="color: #ff4757;"> AI 智能诊断：</strong><br><br>
+                <strong style="color: #ff4757;">🤖 AI 智能诊断：</strong><br><br>
                 {{ reportData }}
             </div>
         </div>
@@ -73,8 +86,12 @@
                 const netUp = ref(0); const netDown = ref(0);
                 const topProcs = ref([]); 
                 const isDiagnosing = ref(false); const reportData = ref("");
+                
+                // 💻 新增：系统静态信息响应式变量
+                const hostname = ref("加载中...");
+                const localIp = ref("0.0.0.0");
+                const diskPercent = ref(0);
 
-                //  智能告警计算逻辑：超标就拉响警报
                 const isAlert = computed(() => cpu.value > 80 || memory.value > 90);
 
                 let myChart = null;
@@ -101,9 +118,14 @@
                         if (result.status === 'success') {
                             cpu.value = result.cpu_usage;
                             memory.value = result.memory_usage;
-                            netUp.value = result.net_upload;       // 接收网速
-                            netDown.value = result.net_download;   // 接收网速
-                            topProcs.value = result.top_processes; // 此时排行榜里已经没有 PID 0 了
+                            netUp.value = result.net_upload;
+                            netDown.value = result.net_download;
+                            topProcs.value = result.top_processes;
+                            
+                            // 💻 映射后端传来的新数据
+                            hostname.value = result.hostname;
+                            localIp.value = result.local_ip;
+                            diskPercent.value = result.disk_percent;
 
                             if(timeData.length > 15) { timeData.shift(); cpuData.shift(); memData.shift(); }
                             timeData.push(result.time);
@@ -125,12 +147,21 @@
                     finally { isDiagnosing.value = false; }
                 }
 
+                // 🚀 弹出详情逻辑：现在能显示路径和内存了
+                const showDetail = (p) => {
+                    alert(`🔍 进程深挖报告\n----------------\n名字：${p.name}\nPID：${p.pid}\nCPU占用：${p.cpu_percent}%\n内存占用：${p.mem_mb} MB\n路径：${p.path}`);
+                }
+
                 onMounted(() => {
                     initChart();
                     setInterval(getData, 2000);
                 });
 
-                return { cpu, memory, netUp, netDown, topProcs, isAlert, isDiagnosing, reportData, getAIReport }
+                return { 
+                    cpu, memory, netUp, netDown, topProcs, isAlert, 
+                    isDiagnosing, reportData, getAIReport, showDetail,
+                    hostname, localIp, diskPercent 
+                }
             }
         }).mount('#app')
     </script>
