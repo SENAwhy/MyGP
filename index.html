@@ -3,44 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AIOps 监控大屏 Pro</title>
+    <title>AIOps 监控大屏 Max</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
         body { background-color: #121212; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; padding-top: 30px; margin: 0;}
-        .card { background: #1e1e1e; border: 1px solid #333; padding: 30px; border-radius: 12px; width: 600px; box-shadow: 0 0 20px rgba(0, 255, 204, 0.1); }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 20px;}
-        .number-board { display: flex; justify-content: space-around; margin-bottom: 20px; }
-        .data-text { font-size: 32px; font-weight: bold; color: #00ffcc; text-align: center; margin-top: 10px;}
-        .mem-text { color: #ff4757; }
+        .card { background: #1e1e1e; border: 1px solid #333; padding: 30px; border-radius: 12px; width: 750px; box-shadow: 0 0 20px rgba(0, 255, 204, 0.1); transition: 0.3s; }
         
-        /* 图表和排行榜容器 */
+        /* 🚨 触发告警时，整个卡片发红光 */
+        .card.alert-mode { border-color: #ff4757; box-shadow: 0 0 30px rgba(255, 71, 87, 0.4); }
+        .alert-text { color: #ff4757 !important; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+
+        .header { border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 20px; text-align: center;}
+        .number-board { display: flex; justify-content: space-around; margin-bottom: 20px; background: #2f3542; padding: 15px; border-radius: 8px;}
+        .data-text { font-size: 28px; font-weight: bold; color: #00ffcc; text-align: center; margin-top: 5px;}
+        
         #chart-container { width: 100%; height: 250px; margin-bottom: 20px; }
         .process-list { background: #2f3542; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px;}
         .process-item { display: flex; justify-content: space-between; border-bottom: 1px dashed #555; padding: 8px 0; }
         
         button { border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.3s; width: 100%; background: #ff4757; color: white; }
-        button:hover { background: #ff6b81; box-shadow: 0 0 15px #ff4757; }
-        button:disabled { background: #555; cursor: not-allowed; box-shadow: none; }
+        button:hover { background: #ff6b81; }
+        button:disabled { background: #555; cursor: not-allowed; }
         .report-box { margin-top: 20px; padding: 15px; background: #2f3542; border-radius: 8px; border-left: 4px solid #ff4757; line-height: 1.6;}
     </style>
 </head>
 <body>
     <div id="app">
-        <div class="card">
+        <div class="card" :class="{ 'alert-mode': isAlert }">
             <div class="header">
-                <h2>🚀 AIOps 智能监控平台 (Pro版)</h2>
+                <h2 :class="{ 'alert-text': isAlert }">
+                    {{ isAlert ? '🚨 警告：服务器负载过高！' : '🚀 AIOps 智能监控中枢 (Max版)' }}
+                </h2>
             </div>
             
             <div class="number-board">
-                <div>CPU 使用率<div class="data-text">{{ cpu }} %</div></div>
-                <div>内存 使用率<div class="data-text mem-text">{{ memory }} %</div></div>
+                <div>CPU 负载<div class="data-text" :class="{'alert-text': cpu > 80}">{{ cpu }} %</div></div>
+                <div>内存 使用<div class="data-text" :class="{'alert-text': memory > 90}">{{ memory }} %</div></div>
+                <div>⬆️ 上传<div class="data-text" style="color:#ffa502;">{{ netUp }} MB/s</div></div>
+                <div>⬇️ 下载<div class="data-text" style="color:#1e90ff;">{{ netDown }} MB/s</div></div>
             </div>
 
             <div id="chart-container"></div>
 
             <div class="process-list">
-                <strong style="color: #ced6e0;">🔥 实时高耗能进程 Top 3：</strong>
+                <strong style="color: #ced6e0;">🔥 真实高耗能进程 Top 3 (已过滤系统空闲)：</strong>
                 <div class="process-item" v-for="(p, index) in topProcs" :key="index">
                     <span>🥇 NO.{{ index + 1 }} | {{ p.name }} (PID: {{ p.pid }})</span>
                     <span style="color: #ff4757; font-weight: bold;">{{ p.cpu_percent }}%</span>
@@ -58,18 +66,20 @@
     </div>
 
     <script>
-        const { createApp, ref, onMounted } = Vue
+        const { createApp, ref, onMounted, computed } = Vue
         createApp({
             setup() {
                 const cpu = ref(0); const memory = ref(0);
+                const netUp = ref(0); const netDown = ref(0);
                 const topProcs = ref([]); 
                 const isDiagnosing = ref(false); const reportData = ref("");
 
-                // 给折线图准备的数据数组
+                //  智能告警计算逻辑：超标就拉响警报
+                const isAlert = computed(() => cpu.value > 80 || memory.value > 90);
+
                 let myChart = null;
                 const timeData = []; const cpuData = []; const memData = [];
 
-                // 🌟 初始化 ECharts 图表
                 const initChart = () => {
                     myChart = echarts.init(document.getElementById('chart-container'));
                     myChart.setOption({
@@ -91,15 +101,15 @@
                         if (result.status === 'success') {
                             cpu.value = result.cpu_usage;
                             memory.value = result.memory_usage;
-                            topProcs.value = result.top_processes; // 更新排行榜
+                            netUp.value = result.net_upload;       // 接收网速
+                            netDown.value = result.net_download;   // 接收网速
+                            topProcs.value = result.top_processes; // 此时排行榜里已经没有 PID 0 了
 
-                            // 🌟 更新图表数据：保持屏幕上最多显示 10 个点
-                            if(timeData.length > 10) { timeData.shift(); cpuData.shift(); memData.shift(); }
+                            if(timeData.length > 15) { timeData.shift(); cpuData.shift(); memData.shift(); }
                             timeData.push(result.time);
                             cpuData.push(result.cpu_usage);
                             memData.push(result.memory_usage);
 
-                            // 让图表重新渲染
                             myChart.setOption({ xAxis: { data: timeData }, series: [ { data: cpuData }, { data: memData } ] });
                         }
                     } catch (error) { console.error("数据连接断开"); }
@@ -115,13 +125,12 @@
                     finally { isDiagnosing.value = false; }
                 }
 
-                // Vue 页面加载完毕后，启动图表和定时器
                 onMounted(() => {
                     initChart();
                     setInterval(getData, 2000);
                 });
 
-                return { cpu, memory, topProcs, isDiagnosing, reportData, getAIReport }
+                return { cpu, memory, netUp, netDown, topProcs, isAlert, isDiagnosing, reportData, getAIReport }
             }
         }).mount('#app')
     </script>
