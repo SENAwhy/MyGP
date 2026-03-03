@@ -84,3 +84,24 @@ def get_system_data():
 
     save_to_csv(result_data)
     return result_data
+
+def get_history_data(limit=100):
+    """读取 CSV 中最后的 100 条记录"""
+    if not os.path.exists(LOG_FILE):
+        return []
+    
+    history = []
+    try:
+        with open(LOG_FILE, mode='r', encoding='utf-8') as f:
+            # 使用 collections.deque 快速读取最后 N 行，效率极高
+            import collections
+            rows = collections.deque(csv.DictReader(f), limit)
+            for row in rows:
+                history.append({
+                    "time": row["time"],
+                    "cpu": float(row["cpu_usage"]),
+                    "mem": float(row["memory_usage"])
+                })
+    except Exception as e:
+        print(f"读取历史失败: {e}")
+    return history

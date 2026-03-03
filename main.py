@@ -35,3 +35,10 @@ def ai_diagnose():
     report = get_diagnose_report(top_proc['name'], top_proc['cpu_percent'])
     
     return {"status": "success", "report": report}
+
+from core.sys_monitor import get_system_data, get_history_data # 引入新函数
+
+@app.get("/api/history")
+def get_history():
+    data = get_history_data()
+    return {"status": "success", "history": data}

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AIOps 监控大屏 Max</title>
+    <title>AIOps 监控大屏 Max (Pro+)</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
@@ -12,20 +12,24 @@
         .card.alert-mode { border-color: #ff4757; box-shadow: 0 0 30px rgba(255, 71, 87, 0.4); }
         .alert-text { color: #ff4757 !important; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
+        
         .header { border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 15px; text-align: center;}
         
-        /* 💻 系统画像条样式 */
+        /* 控制按钮区域 */
+        .control-btns { display: flex; gap: 10px; margin-bottom: 15px; }
+        .btn-sm { flex: 1; padding: 10px; font-size: 13px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; color: white; }
+
         .sys-info-bar { display: flex; justify-content: space-around; background: #00ffcc11; padding: 10px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; color: #00ffcc; border: 1px solid #00ffcc33;}
-        
         .number-board { display: flex; justify-content: space-around; margin-bottom: 20px; background: #2f3542; padding: 15px; border-radius: 8px;}
         .data-text { font-size: 28px; font-weight: bold; color: #00ffcc; text-align: center; margin-top: 5px;}
+        
         #chart-container { width: 100%; height: 250px; margin-bottom: 20px; }
         .process-list { background: #2f3542; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px;}
         .process-item { display: flex; justify-content: space-between; border-bottom: 1px dashed #555; padding: 10px 0; cursor: pointer;}
         .process-item:hover { background: #3d4451; border-radius: 4px; padding-left: 5px;}
-        button { border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.3s; width: 100%; background: #ff4757; color: white; }
-        button:hover { background: #ff6b81; }
-        button:disabled { background: #555; cursor: not-allowed; }
+        
+        .main-btn { border: none; padding: 15px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.3s; width: 100%; background: #ff4757; color: white; }
+        .main-btn:hover { background: #ff6b81; }
         .report-box { margin-top: 20px; padding: 15px; background: #2f3542; border-radius: 8px; border-left: 4px solid #ff4757; line-height: 1.6;}
     </style>
 </head>
@@ -33,9 +37,16 @@
     <div id="app">
         <div class="card" :class="{ 'alert-mode': isAlert }">
             <div class="header">
-                <h2 :class="{ 'alert-text': isAlert }">
-                    {{ isAlert ? '🚨 警告：服务器负载过高！' : '🚀 AIOps 智能监控中枢 (Max版)' }}
-                </h2>
+                <h2>{{ isHistoryMode ? '🕰️ 历史记录穿越中...' : '🚀 AIOps 智能监控中枢 (Max版)' }}</h2>
+            </div>
+
+            <div class="control-btns">
+                <button class="btn-sm" @click="toggleHistory" :style="{background: isHistoryMode ? '#ffa502' : '#4b5563'}">
+                    {{ isHistoryMode ? '🔙 返回实时监控' : '🕰️ 查看历史趋势' }}
+                </button>
+                <button class="btn-sm" @click="requestNotifyPermission" style="background: #3b82f6;">
+                    🔔 开启桌面强推警报
+                </button>
             </div>
 
             <div class="sys-info-bar">
@@ -53,7 +64,7 @@
 
             <div id="chart-container"></div>
 
-            <div class="process-list">
+            <div class="process-list" v-if="!isHistoryMode">
                 <strong style="color: #ced6e0;">🔥 实时高耗能进程 (点击查看详情)：</strong>
                 <div class="process-item" v-for="(p, index) in topProcs" :key="index" @click="showDetail(p)">
                     <span>🥇 NO.{{ index + 1 }} | {{ p.name }} (PID: {{ p.pid }})</span>
@@ -61,9 +72,10 @@
                 </div>
             </div>
             
-            <button @click="getAIReport" :disabled="isDiagnosing">
-                {{ isDiagnosing ? '🧠 DeepSeek 正在深度分析中...' : '🚨 异常发生？一键生成 AI 根因报告' }}
+            <button class="main-btn" @click="getAIReport" :disabled="isDiagnosing || isHistoryMode">
+                {{ isDiagnosing ? '🧠 DeepSeek 正在深度分析中...' : '🚨 异常发生？一键生成 AI 报告' }}
             </button>
+            
             <div v-if="reportData" class="report-box">
                 <strong style="color: #ff4757;">🤖 AI 智能诊断：</strong><br><br>
                 {{ reportData }}
@@ -78,14 +90,13 @@
                 const cpu = ref(0); const memory = ref(0);
                 const netUp = ref(0); const netDown = ref(0);
                 const topProcs = ref([]); 
+                const hostname = ref("获取中..."); const localIp = ref("0.0.0.0"); const diskPercent = ref(0);
                 const isDiagnosing = ref(false); const reportData = ref("");
                 
-                // 🚀 新增响应式变量
-                const hostname = ref("获取中...");
-                const localIp = ref("0.0.0.0");
-                const diskPercent = ref(0);
-
+                // 🚀 方案 B：状态控制
+                const isHistoryMode = ref(false);
                 const isAlert = computed(() => cpu.value > 80 || memory.value > 90);
+
                 let myChart = null;
                 const timeData = []; const cpuData = []; const memData = [];
 
@@ -95,38 +106,68 @@
                         tooltip: { trigger: 'axis' },
                         legend: { data: ['CPU', '内存'], textStyle: { color: '#fff' } },
                         xAxis: { type: 'category', data: timeData, axisLabel: { color: '#fff' } },
-                        yAxis: { type: 'value', max: 100, axisLabel: { color: '#fff' }, splitLine: { lineStyle: { color: '#333' } } },
+                        yAxis: { type: 'value', max: 100, axisLabel: { color: '#fff' } },
                         series: [
-                            { name: 'CPU', type: 'line', data: cpuData, smooth: true, itemStyle: {color: '#00ffcc'}, areaStyle: {opacity: 0.1} },
-                            { name: '内存', type: 'line', data: memData, smooth: true, itemStyle: {color: '#ff4757'}, areaStyle: {opacity: 0.1} }
+                            { name: 'CPU', type: 'line', data: cpuData, smooth: true, itemStyle: {color: '#00ffcc'} },
+                            { name: '内存', type: 'line', data: memData, smooth: true, itemStyle: {color: '#ff4757'} }
                         ]
                     });
                 };
 
+                // 🚀 开启桌面通知权限
+                const requestNotifyPermission = () => {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') alert('✅ 成功！当 CPU 爆表时，你将收到桌面推送。');
+                    });
+                };
+
                 const getData = async () => {
+                    if (isHistoryMode.value) return; // 历史模式下停止自动更新
                     try {
                         const response = await fetch('http://127.0.0.1:8000/api/system_status');
                         const result = await response.json();
                         if (result.status === 'success') {
                             cpu.value = result.cpu_usage;
                             memory.value = result.memory_usage;
-                            netUp.value = result.net_upload;
-                            netDown.value = result.net_download;
+                            netUp.value = result.net_upload; netDown.value = result.net_download;
                             topProcs.value = result.top_processes;
-                            
-                            // 🚀 将后端传来的新字段映射到页面上
-                            hostname.value = result.hostname;
-                            localIp.value = result.local_ip;
-                            diskPercent.value = result.disk_percent;
+                            hostname.value = result.hostname; localIp.value = result.local_ip; diskPercent.value = result.disk_percent;
+
+                            // 🚀 桌面通知逻辑
+                            if (result.cpu_usage > 90 && Notification.permission === "granted") {
+                                new Notification("🚨 AIOps 严重负载警报", {
+                                    body: `警告：当前 CPU 占用已达 ${result.cpu_usage}%！`,
+                                    icon: "https://cdn-icons-png.flaticon.com/512/564/564619.png"
+                                });
+                            }
 
                             if(timeData.length > 15) { timeData.shift(); cpuData.shift(); memData.shift(); }
-                            timeData.push(result.time);
-                            cpuData.push(result.cpu_usage);
-                            memData.push(result.memory_usage);
+                            timeData.push(result.time); cpuData.push(result.cpu_usage); memData.push(result.memory_usage);
                             myChart.setOption({ xAxis: { data: timeData }, series: [ { data: cpuData }, { data: memData } ] });
                         }
-                    } catch (error) { console.error("连接断开"); }
+                    } catch (e) { console.error("连接失败"); }
                 }
+
+                // 🚀 穿越模式：读取后端历史接口
+                const toggleHistory = async () => {
+                    if (!isHistoryMode.value) {
+                        try {
+                            const response = await fetch('http://127.0.0.1:8000/api/history');
+                            const result = await response.json();
+                            if (result.status === 'success') {
+                                isHistoryMode.value = true;
+                                timeData.length = 0; cpuData.length = 0; memData.length = 0;
+                                result.history.forEach(h => {
+                                    timeData.push(h.time); cpuData.push(h.cpu); memData.push(h.mem);
+                                });
+                                myChart.setOption({ xAxis: { data: timeData }, series: [{ data: cpuData }, { data: memData }] });
+                            }
+                        } catch (e) { alert("获取历史失败，请检查后端接口。"); }
+                    } else {
+                        isHistoryMode.value = false;
+                        timeData.length = 0; cpuData.length = 0; memData.length = 0; // 重置实时图表
+                    }
+                };
 
                 const getAIReport = async () => {
                     isDiagnosing.value = true; reportData.value = "";
@@ -134,7 +175,7 @@
                         const response = await fetch('http://127.0.0.1:8000/api/diagnose');
                         const result = await response.json();
                         reportData.value = result.report;
-                    } catch (error) { reportData.value = "AI 调用失败"; } 
+                    } catch (e) { reportData.value = "AI 调用失败"; } 
                     finally { isDiagnosing.value = false; }
                 }
 
@@ -147,7 +188,7 @@
                     setInterval(getData, 2000);
                 });
 
-                return { cpu, memory, netUp, netDown, topProcs, isAlert, isDiagnosing, reportData, getAIReport, showDetail, hostname, localIp, diskPercent }
+                return { cpu, memory, netUp, netDown, topProcs, isAlert, isDiagnosing, reportData, getAIReport, showDetail, hostname, localIp, diskPercent, isHistoryMode, toggleHistory, requestNotifyPermission }
             }
         }).mount('#app')
     </script>
