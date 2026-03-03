@@ -9,27 +9,20 @@
     <style>
         body { background-color: #121212; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; padding-top: 30px; margin: 0;}
         .card { background: #1e1e1e; border: 1px solid #333; padding: 30px; border-radius: 12px; width: 750px; box-shadow: 0 0 20px rgba(0, 255, 204, 0.1); transition: 0.3s; }
-        
-        /* 🚨 触发告警时，整个卡片发红光 */
         .card.alert-mode { border-color: #ff4757; box-shadow: 0 0 30px rgba(255, 71, 87, 0.4); }
         .alert-text { color: #ff4757 !important; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
-
-        .header { border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 10px; text-align: center;}
+        .header { border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 15px; text-align: center;}
         
-        /* 💻 新增：系统静态信息条样式 */
-        .sys-info-bar { display: flex; justify-content: space-around; background: #00ffcc11; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; color: #00ffcc; border: 1px solid #00ffcc33;}
+        /* 💻 系统画像条样式 */
+        .sys-info-bar { display: flex; justify-content: space-around; background: #00ffcc11; padding: 10px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; color: #00ffcc; border: 1px solid #00ffcc33;}
         
         .number-board { display: flex; justify-content: space-around; margin-bottom: 20px; background: #2f3542; padding: 15px; border-radius: 8px;}
         .data-text { font-size: 28px; font-weight: bold; color: #00ffcc; text-align: center; margin-top: 5px;}
-        
         #chart-container { width: 100%; height: 250px; margin-bottom: 20px; }
         .process-list { background: #2f3542; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px;}
-        
-        /* 🚀 优化：进程条加入鼠标悬停效果 */
-        .process-item { display: flex; justify-content: space-between; border-bottom: 1px dashed #555; padding: 10px 0; cursor: pointer; transition: 0.2s;}
-        .process-item:hover { background: #3d4451; padding-left: 5px; border-radius: 4px;}
-        
+        .process-item { display: flex; justify-content: space-between; border-bottom: 1px dashed #555; padding: 10px 0; cursor: pointer;}
+        .process-item:hover { background: #3d4451; border-radius: 4px; padding-left: 5px;}
         button { border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.3s; width: 100%; background: #ff4757; color: white; }
         button:hover { background: #ff6b81; }
         button:disabled { background: #555; cursor: not-allowed; }
@@ -61,7 +54,7 @@
             <div id="chart-container"></div>
 
             <div class="process-list">
-                <strong style="color: #ced6e0;">🔥 实时高能耗进程 (点击查看路径)：</strong>
+                <strong style="color: #ced6e0;">🔥 实时高耗能进程 (点击查看详情)：</strong>
                 <div class="process-item" v-for="(p, index) in topProcs" :key="index" @click="showDetail(p)">
                     <span>🥇 NO.{{ index + 1 }} | {{ p.name }} (PID: {{ p.pid }})</span>
                     <span style="color: #ff4757; font-weight: bold;">{{ p.cpu_percent }}%</span>
@@ -69,7 +62,7 @@
             </div>
             
             <button @click="getAIReport" :disabled="isDiagnosing">
-                {{ isDiagnosing ? ' DeepSeek 正在深度诊断中...' : '🚨 异常发生？一键生成 AI 根因报告' }}
+                {{ isDiagnosing ? '🧠 DeepSeek 正在深度分析中...' : '🚨 异常发生？一键生成 AI 根因报告' }}
             </button>
             <div v-if="reportData" class="report-box">
                 <strong style="color: #ff4757;">🤖 AI 智能诊断：</strong><br><br>
@@ -87,13 +80,12 @@
                 const topProcs = ref([]); 
                 const isDiagnosing = ref(false); const reportData = ref("");
                 
-                // 💻 新增：系统静态信息响应式变量
-                const hostname = ref("加载中...");
+                // 🚀 新增响应式变量
+                const hostname = ref("获取中...");
                 const localIp = ref("0.0.0.0");
                 const diskPercent = ref(0);
 
                 const isAlert = computed(() => cpu.value > 80 || memory.value > 90);
-
                 let myChart = null;
                 const timeData = []; const cpuData = []; const memData = [];
 
@@ -122,7 +114,7 @@
                             netDown.value = result.net_download;
                             topProcs.value = result.top_processes;
                             
-                            // 💻 映射后端传来的新数据
+                            // 🚀 将后端传来的新字段映射到页面上
                             hostname.value = result.hostname;
                             localIp.value = result.local_ip;
                             diskPercent.value = result.disk_percent;
@@ -131,10 +123,9 @@
                             timeData.push(result.time);
                             cpuData.push(result.cpu_usage);
                             memData.push(result.memory_usage);
-
                             myChart.setOption({ xAxis: { data: timeData }, series: [ { data: cpuData }, { data: memData } ] });
                         }
-                    } catch (error) { console.error("数据连接断开"); }
+                    } catch (error) { console.error("连接断开"); }
                 }
 
                 const getAIReport = async () => {
@@ -143,13 +134,12 @@
                         const response = await fetch('http://127.0.0.1:8000/api/diagnose');
                         const result = await response.json();
                         reportData.value = result.report;
-                    } catch (error) { reportData.value = "请求 AI 接口失败。"; } 
+                    } catch (error) { reportData.value = "AI 调用失败"; } 
                     finally { isDiagnosing.value = false; }
                 }
 
-                // 🚀 弹出详情逻辑：现在能显示路径和内存了
                 const showDetail = (p) => {
-                    alert(`🔍 进程深挖报告\n----------------\n名字：${p.name}\nPID：${p.pid}\nCPU占用：${p.cpu_percent}%\n内存占用：${p.mem_mb} MB\n路径：${p.path}`);
+                    alert(`🔍 进程深挖\n名字: ${p.name}\nPID: ${p.pid}\n内存: ${p.mem_mb} MB\n路径: ${p.path}`);
                 }
 
                 onMounted(() => {
@@ -157,11 +147,7 @@
                     setInterval(getData, 2000);
                 });
 
-                return { 
-                    cpu, memory, netUp, netDown, topProcs, isAlert, 
-                    isDiagnosing, reportData, getAIReport, showDetail,
-                    hostname, localIp, diskPercent 
-                }
+                return { cpu, memory, netUp, netDown, topProcs, isAlert, isDiagnosing, reportData, getAIReport, showDetail, hostname, localIp, diskPercent }
             }
         }).mount('#app')
     </script>

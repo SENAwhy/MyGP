@@ -3,43 +3,43 @@ import psutil
 import time
 import csv
 import os
+import socket  # 引入这个库来获取网络信息
 
-#  1. 初始化配置
+# 1. 初始化配置
 last_net_io = psutil.net_io_counters()
 last_time = time.time()
 LOG_FILE = "monitor_log.csv"
-
-# 初始化 CPU 采样
 psutil.cpu_percent(interval=None)
 
 def save_to_csv(data):
-    """将监控数据持久化到 CSV 文件"""
+    """将数据存入 CSV"""
     file_exists = os.path.isfile(LOG_FILE)
     try:
-        # 'a' 代表 append（追加模式）
         with open(LOG_FILE, mode='a', newline='', encoding='utf-8') as f:
+            # 只记录核心数值数据
             fieldnames = ["time", "cpu_usage", "memory_usage", "net_upload", "net_download"]
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            
-            # 如果是第一次創建文件，先寫入表頭
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
             if not file_exists:
                 writer.writeheader()
-            
-            # 只写入基数
-            writer.writerow({
-                "time": data["time"],
-                "cpu_usage": data["cpu_usage"],
-                "memory_usage": data["memory_usage"],
-                "net_upload": data["net_upload"],
-                "net_download": data["net_download"]
-            })
+            writer.writerow(data)
     except Exception as e:
-        print(f"日志写入失败: {e}")
+        print(f"写入日志失败: {e}")
 
 def get_system_data():
     global last_net_io, last_time
     
-    # 计算时间与网速
+    #  2. 获取静态系统画像
+    hostname = socket.gethostname()
+    try:
+        # 获取局域网 IP
+        local_ip = socket.gethostbyname(hostname)
+    except:
+        local_ip = "127.0.0.1"
+    
+    # 获取 C 盘磁盘占用
+    disk = psutil.disk_usage('/')
+    
+    # 3. 计算动态数据
     current_time = time.time()
     time_diff = current_time - last_time
     if time_diff <= 0: time_diff = 0.001
@@ -51,30 +51,30 @@ def get_system_data():
     last_net_io = current_net_io
     last_time = current_time
 
-    # 获取CPU和进程
     cpu_usage = psutil.cpu_percent(interval=None)
-    # core/sys_monitor.py 里的进程抓取部分
     processes = []
     for p in psutil.process_iter(['pid', 'name', 'cpu_percent', 'exe', 'memory_info']):
         try:
             if p.info['pid'] > 4: 
-                # 计算内存占用（转成 MB）
                 mem_mb = p.info['memory_info'].rss / 1024 / 1024
                 processes.append({
                     "pid": p.info['pid'],
                     "name": p.info['name'],
-                    "cpu_percent": p.info['cpu_percent'],
-                    "path": p.info['exe'] or "未知路径", #  新增路径
-                    "memory_mb": round(mem_mb, 2)       # 新增精确内存
+                    "cpu_percent": p.info['cpu_percent'] or 0,
+                    "path": p.info['exe'] or "未知路径",
+                    "mem_mb": round(mem_mb, 2)
                 })
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
             
     top_processes = sorted(processes, key=lambda x: (x['cpu_percent'] or 0), reverse=True)[:3]
 
-    # 封装結果
+    # 🚀 4. 把新抓到的数据塞进结果里发给前端
     result_data = {
         "time": time.strftime("%H:%M:%S"),
+        "hostname": hostname,       # 传递主机名
+        "local_ip": local_ip,       # 传递 IP
+        "disk_percent": disk.percent,# 传递磁盘百分比
         "cpu_usage": cpu_usage,
         "memory_usage": psutil.virtual_memory().percent,
         "net_upload": round(upload_speed, 2),
@@ -82,9 +82,5 @@ def get_system_data():
         "top_processes": top_processes
     }
 
-    # 存一份到硬盘
     save_to_csv(result_data)
-
     return result_data
-
-
