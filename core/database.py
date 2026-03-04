@@ -27,6 +27,17 @@ class SystemLog(Base):
 # 自动在 MySQL 中创建这张表（如果不存在的话）
 Base.metadata.create_all(bind=engine)
 
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, index=True)
+    password_hash = Column(String(255)) # 存储加密后的密码，绝对不存明文
+    role = Column(String(20), default="viewer") # 角色：admin 或 viewer
+
+# 确保自动建表
+Base.metadata.create_all(bind=engine)
+
 def save_to_mysql(data):
     """把字典数据存入数据库"""
     db = SessionLocal()
