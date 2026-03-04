@@ -26,7 +26,6 @@ class SystemLog(Base):
 
 # 自动在 MySQL 中创建这张表（如果不存在的话）
 Base.metadata.create_all(bind=engine)
-
 class User(Base):
     __tablename__ = "users"
     
