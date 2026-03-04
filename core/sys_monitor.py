@@ -4,6 +4,7 @@ import time
 import csv
 import os
 import socket  # 引入这个库来获取网络信息
+from core.database import save_to_mysql
 
 # 1. 初始化配置
 last_net_io = psutil.net_io_counters()
@@ -69,7 +70,7 @@ def get_system_data():
             
     top_processes = sorted(processes, key=lambda x: (x['cpu_percent'] or 0), reverse=True)[:3]
 
-    # 🚀 4. 把新抓到的数据塞进结果里发给前端
+    #  4. 把新抓到的数据塞进结果里发给前端
     result_data = {
         "time": time.strftime("%H:%M:%S"),
         "hostname": hostname,       # 传递主机名
@@ -83,6 +84,9 @@ def get_system_data():
     }
 
     save_to_csv(result_data)
+    #呼叫存盘功能
+    save_to_csv(result_data)
+    save_to_mysql(result_data) #同时写入 MySQL 数据库
     return result_data
 
 def get_history_data(limit=100):
