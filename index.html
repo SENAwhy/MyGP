@@ -14,16 +14,24 @@
         .login-input:focus { outline: none; border-color: #00ffcc; }
         
         .card { background: #1e1e1e; border: 1px solid #333; padding: 30px; border-radius: 12px; width: 750px; box-shadow: 0 0 20px rgba(0, 255, 204, 0.1); transition: 0.3s; }
+        
+        /* 常规高负载警报 */
         .card.alert-mode { border-color: #ff4757; box-shadow: 0 0 30px rgba(255, 71, 87, 0.4); }
+        /* AI 异常预测警报特效 */
+        .card.ai-alert-mode { border-color: #ff0055; box-shadow: 0 0 40px rgba(255, 0, 85, 0.6); animation: ai-shake 0.5s infinite; }
+        
         .alert-text { color: #ff4757 !important; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
+        @keyframes ai-shake { 0% { transform: translateX(0); } 25% { transform: translateX(-2px); } 50% { transform: translateX(2px); } 75% { transform: translateX(-2px); } 100% { transform: translateX(0); } }
         
         .header { border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 15px; text-align: center; position: relative;}
         .logout-btn { position: absolute; right: 0; top: 10px; background: transparent; border: 1px solid #ff4757; color: #ff4757; padding: 5px 10px; font-size: 12px; width: auto; }
         .logout-btn:hover { background: #ff4757; color: white; }
 
-        /* 🚀 新增节点选择器样式 */
         .node-selector { background: #2f3542; color: #00ffcc; border: 1px solid #00ffcc; padding: 10px; border-radius: 6px; font-size: 16px; font-weight: bold; width: 100%; margin-bottom: 20px; cursor: pointer; outline: none;}
+
+        /*  AI 专属警报横幅 */
+        .ai-banner { background: rgba(255, 0, 85, 0.2); border: 1px solid #ff0055; color: #ff0055; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 20px; font-size: 16px; animation: blink 1s infinite; letter-spacing: 1px;}
 
         .control-btns { display: flex; gap: 10px; margin-bottom: 15px; }
         .btn-sm { flex: 1; padding: 10px; font-size: 13px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; color: white; }
@@ -52,7 +60,7 @@
             <p style="color: #ff4757; font-size: 12px; margin-top: 15px;">{{ loginError }}</p>
         </div>
 
-        <div class="card" :class="{ 'alert-mode': isAlert }" v-else>
+        <div class="card" :class="{ 'alert-mode': isAlert, 'ai-alert-mode': isAiAnomaly && currentHost === 'LAPTOP-33OCQVST' }" v-else>
             <div class="header">
                 <h2>{{ isHistoryMode ? '🕰️ 历史记录穿越中...' : '🚀 AIOps 分布式监控集群' }}</h2>
                 <button class="logout-btn" @click="doLogout">退出登录</button>
@@ -63,6 +71,10 @@
                 <option value="Server-Node-B (Beijing)">🌐 监控节点 B：北京云端机房 (Server-Node-B)</option>
             </select>
 
+            <div class="ai-banner" v-if="isAiAnomaly && currentHost === 'LAPTOP-33OCQVST' && !isHistoryMode">
+                ⚠️ [AI 孤立森林算法] 检测到系统行为轨迹异常，请立即排查！
+            </div>
+
             <div class="control-btns">
                 <button class="btn-sm" @click="toggleHistory" :style="{background: isHistoryMode ? '#ffa502' : '#4b5563', color: 'white'}">
                     {{ isHistoryMode ? '🔙 返回实时监控' : '🕰️ 查看历史趋势' }}
@@ -71,9 +83,9 @@
             </div>
 
             <div class="sys-info-bar">
-                <span>💻 主机: {{ hostname }}</span>
+                <span>💻 主机：{{ hostname }}</span>
                 <span>🌐 IP: {{ localIp }}</span>
-                <span>💽 磁盘: {{ diskPercent }}%</span>
+                <span>💽 磁盘：{{ diskPercent }}%</span>
             </div>
             
             <div class="number-board">
@@ -87,7 +99,7 @@
 
             <div class="process-list" v-if="!isHistoryMode">
                 <strong style="color: #ced6e0;">🔥 实时高耗能进程：</strong>
-                <div v-if="topProcs.length === 0" style="color: #777; margin-top: 10px;">暂无远端服务器进程权限...</div>
+                <div v-if="topProcs.length === 0" style="color: #777; margin-top: 10px;">暂无远程服务器进程权限...</div>
                 <div class="process-item" v-for="(p, index) in topProcs" :key="index" @click="showDetail(p)">
                     <span>🥇 NO.{{ index + 1 }} | {{ p.name }} (PID: {{ p.pid }})</span>
                     <span style="color: #ff4757; font-weight: bold;">{{ p.cpu_percent }}%</span>
@@ -111,21 +123,22 @@
             setup() {
                 const isLoggedIn = ref(false); const loginUser = ref(""); const loginPass = ref(""); const loginError = ref(""); const isLoggingIn = ref(false);
                 const token = ref(localStorage.getItem('aiops_token') || "");
-                
-                // 🚀 新增：当前选中的战区
                 const currentHost = ref("LAPTOP-33OCQVST");
 
                 const cpu = ref(0); const memory = ref(0); const netUp = ref(0); const netDown = ref(0);
                 const topProcs = ref([]); const hostname = ref("获取中..."); const localIp = ref("0.0.0.0"); const diskPercent = ref(0);
                 const isDiagnosing = ref(false); const reportData = ref(""); const isHistoryMode = ref(false);
                 const isAlert = computed(() => cpu.value > 80 || memory.value > 90);
+                
+                // 接收 AI 异常判定状态
+                const isAiAnomaly = ref(false);
 
                 let myChart = null;
                 const timeData = []; const cpuData = []; const memData = [];
 
                 const getAuthHeaders = () => { return { 'Authorization': `Bearer ${token.value}` }; };
 
-                const doLogin = async () => { /* 登录逻辑不变，省略展开... */
+                const doLogin = async () => {
                     isLoggingIn.value = true; loginError.value = "";
                     try {
                         const formData = new URLSearchParams(); formData.append('username', loginUser.value); formData.append('password', loginPass.value);
@@ -137,9 +150,8 @@
 
                 const doLogout = () => { localStorage.removeItem('aiops_token'); token.value = ""; isLoggedIn.value = false; timeData.length = 0; cpuData.length = 0; memData.length = 0; };
 
-                // 🚀 新增：切换主机时瞬间清空图表
                 const switchHost = () => {
-                    timeData.length = 0; cpuData.length = 0; memData.length = 0;
+                    timeData.length = 0; cpuData.length = 0; memData.length = 0; isAiAnomaly.value = false;
                     if(myChart) myChart.setOption({ xAxis: { data: timeData }, series: [ { data: cpuData }, { data: memData } ] });
                 };
 
@@ -156,7 +168,6 @@
                 const getData = async () => {
                     if (!isLoggedIn.value || isHistoryMode.value) return;
                     try {
-                        // 🚀 核心修改：在请求地址后面加上 ?host=xxx
                         const response = await fetch(`http://127.0.0.1:8000/api/system_status?host=${currentHost.value}`, { headers: getAuthHeaders() });
                         if (response.status === 401) { doLogout(); return; }
                         
@@ -164,27 +175,102 @@
                         if (result.status === 'success') {
                             cpu.value = result.cpu_usage; memory.value = result.memory_usage; netUp.value = result.net_upload; netDown.value = result.net_download;
                             topProcs.value = result.top_processes; hostname.value = result.hostname; localIp.value = result.local_ip; diskPercent.value = result.disk_percent;
-
-                            if (result.cpu_usage > 90 && Notification.permission === "granted") { new Notification("🚨 AIOps 警报", { body: `节点 ${result.hostname} CPU 已达 ${result.cpu_usage}%！` }); }
+                            
+                            // 将后端传来的 AI 判断结果赋值给前端变量
+                            isAiAnomaly.value = result.is_anomaly || false;
 
                             if(timeData.length > 15) { timeData.shift(); cpuData.shift(); memData.shift(); }
                             timeData.push(result.time); cpuData.push(result.cpu_usage); memData.push(result.memory_usage);
-                            if(myChart) myChart.setOption({ xAxis: { data: timeData }, series: [ { data: cpuData }, { data: memData } ] });
+                            
+                            // 如果发生异常，将图表折线瞬间变红
+                            const cpuLineColor = isAiAnomaly.value ? '#ff0055' : '#00ffcc';
+                            if(myChart) myChart.setOption({ xAxis: { data: timeData }, series: [ { data: cpuData, itemStyle: {color: cpuLineColor} }, { data: memData } ] });
                         }
                     } catch (e) {}
                 }
 
-                // ... 省略 toggleHistory, getAIReport, showDetail (不变) ...
-                const toggleHistory = async () => { /* 保持原样 */ };
-                const getAIReport = async () => { /* 保持原样 */ };
-                const showDetail = (p) => { alert(`🔍 进程深挖\n名字: ${p.name}\nPID: ${p.pid}`); };
+                const toggleHistory = async () => {
+                    // 1. 切换模式：如果是在实时监控，就切到历史模式；反之亦然
+                    isHistoryMode.value = !isHistoryMode.value;
+                    
+                    // 2. 清空当前的图表数据，准备迎接历史数据
+                    timeData.length = 0;
+                    cpuData.length = 0;
+                    memData.length = 0;
+
+                    if (isHistoryMode.value) {
+                        console.log("📜 正在调取数据库历史档案...");
+                        try {
+                            // 3. 呼叫后端历史接口
+                            const response = await fetch('http://127.0.0.1:8000/api/history', {
+                                headers: getAuthHeaders()
+                            });
+                            const result = await response.json();
+                            
+                            if (result.status === 'success') {
+                                // 4. 把数据库里的老数据塞进图表
+                                result.data.forEach(item => {
+                                    timeData.push(item.time);
+                                    cpuData.push(item.cpu);
+                                    memData.push(item.mem);
+                                });
+                                // 5. 立即刷新图表显示
+                                if(myChart) {
+                                    myChart.setOption({
+                                        xAxis: { data: timeData },
+                                        series: [{ data: cpuData }, { data: memData }]
+                                    });
+                                }
+                            }
+                        } catch (e) {
+                            console.error("历史数据读取失败:", e);
+                            alert("读取历史档案失败，请检查数据库连接");
+                        }
+                    } else {
+                        console.log("🚀 返回实时监控模式");
+                        // 切换回实时模式，getData() 计时器会自动开始工作
+                    }
+                };
+                const getAIReport = async () => {
+                    // 1. 如果正在分析，直接返回，防止重复点击
+                    if (isDiagnosing.value) return;
+
+                    console.log("🚀 启动 AI 诊断请求...");
+                    isDiagnosing.value = true;
+                    reportData.value = "🤖 正在深度扫描系统进程，请稍候...";
+
+                    try {
+                        // 2. 发送请求到后端接口
+                        const response = await fetch('http://127.0.0.1:8000/api/diagnose', {
+                            method: 'GET',
+                            headers: getAuthHeaders()
+                        });
+
+                        const result = await response.json();
+                        console.log("📥 后端回传结果:", result);
+
+                        if (result.status === 'success') {
+                            // 3. 将后端返回的报告文字显示在网页上
+                            reportData.value = result.report;
+                        } else {
+                            reportData.value = "❌ 诊断失败：" + (result.report || "未知错误");
+                        }
+                    } catch (e) {
+                        console.error("🔥 网络请求失败:", e);
+                        reportData.value = "📡 无法连接到 AI 诊断中枢，请检查后端服务器是否正常运行。";
+                    } finally {
+                        // 4. 无论成功还是失败，最后都关闭加载状态
+                        isDiagnosing.value = false;
+                    }
+                };
+                const showDetail = (p) => { alert(`🔍 进程深挖\n名字：${p.name}\nPID: ${p.pid}`); };
 
                 onMounted(() => {
                     if (token.value) { isLoggedIn.value = true; nextTick(() => { initChart(); }); }
                     setInterval(getData, 2000);
                 });
 
-                return { isLoggedIn, loginUser, loginPass, doLogin, doLogout, isLoggingIn, loginError, cpu, memory, netUp, netDown, topProcs, isAlert, isDiagnosing, reportData, getAIReport, showDetail, hostname, localIp, diskPercent, isHistoryMode, toggleHistory, requestNotifyPermission, currentHost, switchHost }
+                return { isLoggedIn, loginUser, loginPass, doLogin, doLogout, isLoggingIn, loginError, cpu, memory, netUp, netDown, topProcs, isAlert, isAiAnomaly, isDiagnosing, reportData, getAIReport, showDetail, hostname, localIp, diskPercent, isHistoryMode, toggleHistory, requestNotifyPermission, currentHost, switchHost }
             }
         }).mount('#app')
     </script>

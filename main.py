@@ -83,10 +83,16 @@ def get_status(host: Optional[str] = None, token: str = Depends(oauth2_scheme)):
     return {"status": "success", **data}
 
 # 接口2：获取历史记录
+# main.py
 @app.get("/api/history")
 def get_history(token: str = Depends(oauth2_scheme)):
-    data = get_history_data()
-    return {"status": "success", "history": data}
+    try:
+        from core.sys_monitor import get_history_data
+        data = get_history_data(limit=100) 
+        return {"status": "success", "data": data}
+    except Exception as e:
+        print(f"读取历史接口崩溃: {e}")
+        return {"status": "error", "message": str(e)}
 
 #  接口3：AI诊断
 @app.get("/api/diagnose")

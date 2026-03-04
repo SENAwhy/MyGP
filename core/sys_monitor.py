@@ -5,6 +5,7 @@ import csv
 import os
 import socket  # 引入这个库来获取网络信息
 from core.database import save_to_mysql
+from core.ai_anomaly import ai_engine
 
 # 1. 初始化配置
 last_net_io = psutil.net_io_counters()
@@ -73,9 +74,9 @@ def get_system_data():
     #  4. 把新抓到的数据塞进结果里发给前端
     result_data = {
         "time": time.strftime("%H:%M:%S"),
-        "hostname": hostname,       # 传递主机名
-        "local_ip": local_ip,       # 传递 IP
-        "disk_percent": disk.percent,# 传递磁盘百分比
+        "hostname": hostname,
+        "local_ip": local_ip,
+        "disk_percent": disk.percent,
         "cpu_usage": cpu_usage,
         "memory_usage": psutil.virtual_memory().percent,
         "net_upload": round(upload_speed, 2),
@@ -83,10 +84,14 @@ def get_system_data():
         "top_processes": top_processes
     }
 
+    # 5. 呼叫存盘功能 
     save_to_csv(result_data)
-    #呼叫存盘功能
-    save_to_csv(result_data)
-    save_to_mysql(result_data) #同时写入 MySQL 数据库
+    save_to_mysql(result_data)
+    
+    #从 result_data 里提取正确的变量喂给 AI
+    is_anomaly = ai_engine.detect(result_data["cpu_usage"], result_data["memory_usage"])
+    result_data["is_anomaly"] = bool(is_anomaly) # 把 AI 的判断结果塞进去
+    
     return result_data
 
 def get_history_data(limit=100):
@@ -97,7 +102,6 @@ def get_history_data(limit=100):
     history = []
     try:
         with open(LOG_FILE, mode='r', encoding='utf-8') as f:
-            # 使用 collections.deque 快速读取最后 N 行，效率极高
             import collections
             rows = collections.deque(csv.DictReader(f), limit)
             for row in rows:
