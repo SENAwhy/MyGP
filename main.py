@@ -94,7 +94,9 @@ def get_status(host: Optional[str] = None, token: str = Depends(oauth2_scheme)):
                    f"请立即登录 AIOps 监控大屏查看详情。")
         
         # 开启新线程发送邮件，不阻塞主程序
-        threading.Thread(target=send_alert_email, args=(subject, content)).start()
+        t = threading.Thread(target=send_alert_email, args=(subject, content))
+        t.daemon = True  #设置为守护线程，主程序关了它就得关
+        t.start()
         
         # 更新最后发信时间
         last_email_time = current_time
