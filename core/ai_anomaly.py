@@ -22,14 +22,14 @@ class AnomalyDetector:
         db.close()
 
         if len(logs) < 50:
-            print("⚠️ [AI 引擎] 历史数据不足 50 条，模型暂不启动（先积累点数据）。")
+            print("⚠️ [AI 引擎] 历史数据不足 50 条，模型暂不启动。")
             return
 
         # 把数据库里的记录提取成 AI 能看懂的 DataFrame 格式
         data = [[log.cpu_usage, log.mem_usage] for log in logs]
         df = pd.DataFrame(data, columns=['cpu', 'mem'])
 
-        # 开始训练！(拟合基线)
+        # 开始训练(拟合基线)
         self.model.fit(df)
         self.is_trained = True
         print("✅ [AI 引擎] 孤立森林模型训练完成！系统日常行为基线已建立。")

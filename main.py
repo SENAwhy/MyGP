@@ -4,12 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 import threading  # 导入线程库，用于后台发邮件
 import time       # 用于计时，防止邮件轰炸
-
 from core.database import SessionLocal, User, SystemLog
 from core.auth import verify_password, get_password_hash, create_access_token
 from core.sys_monitor import get_system_data, get_history_data
 from core.ai_helper import get_diagnose_report
-from core.notifier import send_alert_email # 导入你的邮件模块
+from core.notifier import send_alert_email # 导入邮件模块
 
 app = FastAPI()
 
@@ -52,7 +51,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     access_token = create_access_token(data={"sub": user.username, "role": user.role})
     return {"access_token": access_token, "token_type": "bearer"}
 
-# --- 核心接口：获取状态 + 邮件报警触发 ---
+#获取状态 + 邮件报警触发 
 @app.get("/api/system_status")
 def get_status(host: Optional[str] = None, token: str = Depends(oauth2_scheme)):
     global last_email_time

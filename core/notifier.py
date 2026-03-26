@@ -6,7 +6,7 @@ from email.header import Header
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
 SENDER_EMAIL = "dalembert03@gmail.com"  # 填写发件人
-SENDER_PASS = "wxat qsuu udke oktn"         # 注意：这不是登录密码，是 Gmail 的「应用程序密码」
+SENDER_PASS = "应用程序密码"         # 注意：这不是登录密码，是 Gmail 的「应用程序密码」
 RECEIVER_EMAIL = "wlzj_03@foxmail.com" # 填写你的收件箱
 
 def send_alert_email(subject, content):

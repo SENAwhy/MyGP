@@ -5,7 +5,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 # ：把 root:123456 换成你真实的 MySQL 账号和密码！
 # 格式：mysql+pymysql://账号:密码@IP:端口/数据库名
-SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:why20030319@127.0.0.1:3306/aiops_monitor"
+SQLALCHEMY_DATABASE_URL = "mysql+pymysql://账号:密码@127.0.0.1:3306/aiops_monitor"
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

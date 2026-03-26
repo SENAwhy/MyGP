@@ -62,7 +62,7 @@
 
         <div class="card" :class="{ 'alert-mode': isAlert, 'ai-alert-mode': isAiAnomaly && currentHost === 'LAPTOP-33OCQVST' }" v-else>
             <div class="header">
-                <h2>{{ isHistoryMode ? '🕰️ 历史记录穿越中...' : '🚀 AIOps 分布式监控集群' }}</h2>
+                <h2>{{ isHistoryMode ? '🕰️ 历史记录穿越中...' : 'AIOps 分布式监控集群' }}</h2>
                 <button class="logout-btn" @click="doLogout">退出登录</button>
             </div>
 
@@ -98,7 +98,7 @@
             <div id="chart-container" v-show="!isHistoryMode || (isHistoryMode && timeData.length > 0)"></div>
 
             <div class="process-list" v-if="!isHistoryMode">
-                <strong style="color: #ced6e0;">🔥 实时高耗能进程：</strong>
+                <strong style="color: #ced6e0;">实时高耗能进程：</strong>
                 <div v-if="topProcs.length === 0" style="color: #777; margin-top: 10px;">暂无远程服务器进程权限...</div>
                 <div class="process-item" v-for="(p, index) in topProcs" :key="index" @click="showDetail(p)">
                     <span>🥇 NO.{{ index + 1 }} | {{ p.name }} (PID: {{ p.pid }})</span>
@@ -107,11 +107,11 @@
             </div>
             
             <button class="main-btn" @click="getAIReport" :disabled="isDiagnosing || isHistoryMode || currentHost !== 'LAPTOP-33OCQVST'">
-                {{ isDiagnosing ? '🧠 DeepSeek 正在深度分析中...' : '🚨 一键生成 AI 报告 (仅限本地)' }}
+                {{ isDiagnosing ? 'DeepSeek 正在深度分析中...' : '一键生成 AI 报告 (仅限本地)' }}
             </button>
             
             <div v-if="reportData" class="report-box">
-                <strong style="color: #ff4757;">🤖 AI 智能诊断：</strong><br><br>
+                <strong style="color: #ff4757;">AI 智能诊断：</strong><br><br>
                 {{ reportData }}
             </div>
         </div>
@@ -144,7 +144,7 @@
                         const formData = new URLSearchParams(); formData.append('username', loginUser.value); formData.append('password', loginPass.value);
                         const response = await fetch('http://127.0.0.1:8000/api/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData });
                         if (response.ok) { const data = await response.json(); token.value = data.access_token; localStorage.setItem('aiops_token', token.value); isLoggedIn.value = true; nextTick(() => { initChart(); }); } 
-                        else { loginError.value = "⚠️ 身份核对失败，访问被拒绝！"; }
+                        else { loginError.value = "身份核对失败，访问被拒绝！"; }
                     } catch (e) { loginError.value = "无法连接到服务器"; } finally { isLoggingIn.value = false; }
                 };
 
@@ -199,7 +199,7 @@
                     memData.length = 0;
 
                     if (isHistoryMode.value) {
-                        console.log("📜 正在调取数据库历史档案...");
+                        console.log("正在调取数据库历史档案...");
                         try {
                             // 3. 呼叫后端历史接口
                             const response = await fetch('http://127.0.0.1:8000/api/history', {
@@ -227,7 +227,7 @@
                             alert("读取历史档案失败，请检查数据库连接");
                         }
                     } else {
-                        console.log("🚀 返回实时监控模式");
+                        console.log("返回实时监控模式");
                         // 切换回实时模式，getData() 计时器会自动开始工作
                     }
                 };
@@ -235,9 +235,9 @@
                     // 1. 如果正在分析，直接返回，防止重复点击
                     if (isDiagnosing.value) return;
 
-                    console.log("🚀 启动 AI 诊断请求...");
+                    console.log("启动 AI 诊断请求...");
                     isDiagnosing.value = true;
-                    reportData.value = "🤖 正在深度扫描系统进程，请稍候...";
+                    reportData.value = "正在深度扫描系统进程，请稍候...";
 
                     try {
                         // 2. 发送请求到后端接口
@@ -247,23 +247,23 @@
                         });
 
                         const result = await response.json();
-                        console.log("📥 后端回传结果:", result);
+                        console.log("后端回传结果:", result);
 
                         if (result.status === 'success') {
                             // 3. 将后端返回的报告文字显示在网页上
                             reportData.value = result.report;
                         } else {
-                            reportData.value = "❌ 诊断失败：" + (result.report || "未知错误");
+                            reportData.value = "诊断失败：" + (result.report || "未知错误");
                         }
                     } catch (e) {
-                        console.error("🔥 网络请求失败:", e);
-                        reportData.value = "📡 无法连接到 AI 诊断中枢，请检查后端服务器是否正常运行。";
+                        console.error("网络请求失败:", e);
+                        reportData.value = "无法连接到 AI 诊断中枢，请检查后端服务器是否正常运行。";
                     } finally {
                         // 4. 无论成功还是失败，最后都关闭加载状态
                         isDiagnosing.value = false;
                     }
                 };
-                const showDetail = (p) => { alert(`🔍 进程深挖\n名字：${p.name}\nPID: ${p.pid}`); };
+                const showDetail = (p) => { alert(` 进程深挖\n名字：${p.name}\nPID: ${p.pid}`); };
 
                 onMounted(() => {
                     if (token.value) { isLoggedIn.value = true; nextTick(() => { initChart(); }); }
