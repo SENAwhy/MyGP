@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile main.py)",
+      "Bash(python -m py_compile agent.py)",
+      "Bash(python -m py_compile core/config.py)",
+      "Bash(python -m py_compile core/logger.py)",
+      "Bash(python -m py_compile core/auth.py)",
+      "Bash(python -m py_compile core/database.py)",
+      "Bash(python -m py_compile core/ai_anomaly.py)",
+      "Bash(python -m py_compile core/alert_engine.py)",
+      "Bash(python -m py_compile core/sys_monitor.py)",
+      "Bash(python -m py_compile tests/test_auth.py)",
+      "Bash(pip install *)",
+      "Bash(python -c \"import pymysql; conn=pymysql.connect\\(host='127.0.0.1',user='root',password='why20030319',port=3306\\); conn.close\\(\\); print\\('MySQL 连接成功'\\)\")",
+      "Bash(python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload)",
+      "Read(//c/Users/ASUS/AppData/Local/Temp/claude/E--GP/26f9e2d7-e1bd-4593-86c4-3a47b7002aee/tasks/**)",
+      "Read(//mnt/c/Users/ASUS/AppData/Local/Temp/claude/E--GP/26f9e2d7-e1bd-4593-86c4-3a47b7002aee/tasks/**)",
+      "Bash(curl -s http://127.0.0.1:8000/)",
+      "Bash(curl *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'CPU: {d[\\\\\"cpu_usage\\\\\"]}% | 内存: {d[\\\\\"memory_usage\\\\\"]}% | AI异常: {d[\\\\\"is_anomaly\\\\\"]} | 进程数: {len\\(d[\\\\\"top_processes\\\\\"]\\)}'\\)\")"
+    ]
+  }
+}
