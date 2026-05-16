@@ -18,7 +18,10 @@
       "Read(//mnt/c/Users/ASUS/AppData/Local/Temp/claude/E--GP/26f9e2d7-e1bd-4593-86c4-3a47b7002aee/tasks/**)",
       "Bash(curl -s http://127.0.0.1:8000/)",
       "Bash(curl *)",
-      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'CPU: {d[\\\\\"cpu_usage\\\\\"]}% | 内存: {d[\\\\\"memory_usage\\\\\"]}% | AI异常: {d[\\\\\"is_anomaly\\\\\"]} | 进程数: {len\\(d[\\\\\"top_processes\\\\\"]\\)}'\\)\")"
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'CPU: {d[\\\\\"cpu_usage\\\\\"]}% | 内存: {d[\\\\\"memory_usage\\\\\"]}% | AI异常: {d[\\\\\"is_anomaly\\\\\"]} | 进程数: {len\\(d[\\\\\"top_processes\\\\\"]\\)}'\\)\")",
+      "Bash(python agent.py)",
+      "Bash(python -u agent.py)",
+      "Bash(taskkill /F /IM python.exe)"
     ]
   }
 }
