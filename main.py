@@ -152,7 +152,7 @@ def get_status(
         )
         db.close()
         if log:
-            return {
+            data = {
                 "status": "success",
                 "hostname": log.hostname,
                 "local_ip": "云端节点 (Remote)",
@@ -171,6 +171,8 @@ def get_status(
                 "is_anomaly": False,
                 "anomaly_detail": {},
             }
+            data["triggered_alerts"] = alert_engine.evaluate(data)
+            return data
         return {"status": "error", "detail": "该节点暂无数据"}
 
     # 本地节点逻辑

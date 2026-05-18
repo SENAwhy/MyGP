@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  # ---- 数据库服务器节点 ----
+  node-db:
+    build: .
+    container_name: aiops-node-db
+    hostname: Node-DB-Shanghai
+    environment:
+      - NODE_ROLE=db
+      - DB_URL=mysql+pymysql://root:why20030319@host.docker.internal:3306/aiops_monitor
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+
+  # ---- Web 应用服务器节点 ----
+  node-web:
+    build: .
+    container_name: aiops-node-web
+    hostname: Node-Web-Tokyo
+    environment:
+      - NODE_ROLE=web
+      - DB_URL=mysql+pymysql://root:why20030319@host.docker.internal:3306/aiops_monitor
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+
+  # ---- 存储服务器节点 ----
+  node-storage:
+    build: .
+    container_name: aiops-node-storage
+    hostname: Node-Storage-Frankfurt
+    environment:
+      - NODE_ROLE=storage
+      - DB_URL=mysql+pymysql://root:why20030319@host.docker.internal:3306/aiops_monitor
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5

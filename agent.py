@@ -1,57 +1,140 @@
+"""AIOps 分布式节点采集代理 — 运行在 Docker 容器中。
+
+每个容器扮演一种服务器角色，基于容器内真实的 psutil 指标，
+叠加角色特征负载后上报到 MySQL 的 system_logs 表。
+"""
+
+import psutil
 import time
+import os
 import random
+import socket
 from datetime import datetime
-from core.database import SessionLocal, SystemLog
-from core.config import settings
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
+from sqlalchemy.orm import Session, declarative_base
 
-FAKE_HOSTNAME = "Server-Node-B (Beijing)"
+# ---- 配置 ----
+DB_URL = os.environ.get(
+    "DB_URL",
+    "mysql+pymysql://root:why20030319@host.docker.internal:3306/aiops_monitor",
+)
+ROLE = os.environ.get("NODE_ROLE", "generic")
+NODE_HOSTNAME = os.environ.get("NODE_HOSTNAME", socket.gethostname())
+INTERVAL = 2  # 采集间隔（秒）
+
+# 角色标签 —— 使用 NODE_HOSTNAME 作为数据库中的节点标识
+ROLE_LABELS = {
+    "db": NODE_HOSTNAME,
+    "web": NODE_HOSTNAME,
+    "storage": NODE_HOSTNAME,
+}
+
+Base = declarative_base()
 
 
-def run_agent():
-    print(f" [幽灵探针] {FAKE_HOSTNAME} 启动成功！")
-    print(" 正在向 MySQL 数据库总部持续发送伪装数据...\n")
+class SystemLog(Base):
+    __tablename__ = "system_logs"
+    id = Column(Integer, primary_key=True)
+    log_time = Column(DateTime, default=datetime.now)
+    hostname = Column(String(50))
+    cpu_usage = Column(Float)
+    mem_usage = Column(Float)
+    net_upload = Column(Float)
+    net_download = Column(Float)
+    disk_percent = Column(Float)
+
+
+def apply_role_profile(cpu, mem, disk):
+    """根据不同角色叠加负载特征，让各节点指标有明显差异。"""
+    if ROLE == "db":
+        # 数据库服务器：内存高、CPU 中等偏高、磁盘稳定
+        mem = min(mem + random.uniform(25, 45), 98)
+        cpu = cpu + random.uniform(10, 30)
+        disk = disk + random.uniform(5, 20)
+    elif ROLE == "web":
+        # Web 服务器：CPU 波动大（模拟请求峰值）、内存中等
+        spike = random.random() < 0.15  # 15% 概率出现请求峰值
+        if spike:
+            cpu = cpu + random.uniform(40, 60)
+        else:
+            cpu = cpu + random.uniform(5, 20)
+        mem = min(mem + random.uniform(10, 25), 90)
+    elif ROLE == "storage":
+        # 存储服务器：磁盘使用率高、CPU 和内存低
+        disk = min(disk + random.uniform(25, 50), 97)
+        cpu = cpu + random.uniform(0, 10)
+        mem = mem + random.uniform(5, 15)
+
+    return (
+        round(min(cpu, 99), 1),
+        round(min(mem, 98), 1),
+        round(min(disk, 97), 1),
+    )
+
+
+def collect(engine):
+    """采集一次指标并写入数据库。"""
+    cpu = psutil.cpu_percent(interval=1)
+    mem = psutil.virtual_memory().percent
+    disk = psutil.disk_usage("/").percent
+    net = psutil.net_io_counters()
+
+    # 网络速率在容器内通常很低，叠加一些模拟流量
+    net_up = round(random.uniform(0.3, 4.0), 2)
+    net_down = round(random.uniform(0.5, 10.0), 2)
+
+    cpu, mem, disk = apply_role_profile(cpu, mem, disk)
+
+    display_name = ROLE_LABELS.get(ROLE, NODE_HOSTNAME)
+
+    with Session(engine) as session:
+        log = SystemLog(
+            hostname=display_name,
+            cpu_usage=cpu,
+            mem_usage=mem,
+            net_upload=net_up,
+            net_download=net_down,
+            disk_percent=disk,
+        )
+        session.add(log)
+        session.commit()
+
+    # 尖峰标记
+    flag = " [高负载!]" if (cpu > 80 or mem > 90) else ""
+    print(
+        f"[{datetime.now().strftime('%H:%M:%S')}] {display_name}  |  "
+        f"CPU: {cpu:5.1f}%  MEM: {mem:5.1f}%  DISK: {disk:5.1f}%  "
+        f"NET↑{net_up:.1f} ↓{net_down:.1f} MB/s{flag}"
+    )
+
+
+def main():
+    print(f"=== AIOps Agent 启动 ===")
+    print(f"节点: {NODE_HOSTNAME}")
+    print(f"角色: {ROLE}")
+    print(f"数据库: {DB_URL.replace(DB_URL.split('@')[0].split(':')[-1], '***')}")
+    print()
+
+    engine = create_engine(DB_URL, pool_pre_ping=True)
+
+    # 验证数据库连接
+    try:
+        with engine.connect() as conn:
+            conn.execute(
+                __import__("sqlalchemy").text("SELECT 1")
+            )
+        print("数据库连接成功\n")
+    except Exception as e:
+        print(f"数据库连接失败: {e}")
+        return
 
     while True:
-        db = SessionLocal()
         try:
-            is_spike = random.random() > 0.9
-            cpu = (
-                round(random.uniform(85.0, 99.0), 1)
-                if is_spike
-                else round(random.uniform(5.0, 40.0), 1)
-            )
-            mem = round(random.uniform(40.0, 75.0), 1)
-            up = round(random.uniform(0.1, 5.0), 2)
-            down = round(random.uniform(1.0, 20.0), 2)
-            disk = round(random.uniform(50.0, 70.0), 1)
-
-            log_entry = SystemLog(
-                hostname=FAKE_HOSTNAME,
-                cpu_usage=cpu,
-                mem_usage=mem,
-                net_upload=up,
-                net_download=down,
-                disk_percent=disk,
-            )
-
-            db.add(log_entry)
-            db.commit()
-
-            now_str = datetime.now().strftime("%H:%M:%S")
-            mark = " [尖峰!]" if is_spike else ""
-            print(
-                f"[{now_str}] 发送数据包 -> CPU: {cpu}% | "
-                f"内存: {mem}% | 磁盘: {disk}%{mark}"
-            )
-
+            collect(engine)
         except Exception as e:
-            db.rollback()
-            print(f" 发送失败，网络异常: {e}")
-        finally:
-            db.close()
-
-        time.sleep(2)
+            print(f"采集异常: {e}")
+        time.sleep(INTERVAL)
 
 
 if __name__ == "__main__":
-    run_agent()
+    main()

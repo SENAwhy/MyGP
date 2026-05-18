@@ -73,7 +73,9 @@ onUnmounted(() => {
       @change="handleSwitchHost"
     >
       <option value="LAPTOP-33OCQVST">节点 A：本地主机 (LAPTOP-33OCQVST)</option>
-      <option value="Server-Node-B (Beijing)">节点 B：北京云端机房 (Server-Node-B)</option>
+      <option value="Node-DB-Shanghai">节点 B：数据库服务器 (Node-DB-Shanghai)</option>
+      <option value="Node-Web-Tokyo">节点 C：Web应用服务器 (Node-Web-Tokyo)</option>
+      <option value="Node-Storage-Frankfurt">节点 D：存储服务器 (Node-Storage-Frankfurt)</option>
     </select>
 
     <!-- AI anomaly banner -->

@@ -21,7 +21,16 @@
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'CPU: {d[\\\\\"cpu_usage\\\\\"]}% | 内存: {d[\\\\\"memory_usage\\\\\"]}% | AI异常: {d[\\\\\"is_anomaly\\\\\"]} | 进程数: {len\\(d[\\\\\"top_processes\\\\\"]\\)}'\\)\")",
       "Bash(python agent.py)",
       "Bash(python -u agent.py)",
-      "Bash(taskkill /F /IM python.exe)"
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(pip show *)",
+      "Bash(pip list *)",
+      "Bash(python *)",
+      "Bash(NODE_ROLE=db NODE_HOSTNAME=Node-DB-Shanghai python agent.py)",
+      "Bash(NODE_ROLE=web NODE_HOSTNAME=Node-Web-Tokyo python agent.py)",
+      "Bash(NODE_ROLE=storage NODE_HOSTNAME=Node-Storage-Frankfurt python agent.py)",
+      "Bash(DB_URL=\"mysql+pymysql://root:why20030319@127.0.0.1:3306/aiops_monitor\" NODE_ROLE=db NODE_HOSTNAME=Node-DB-Shanghai python agent.py)",
+      "Bash(DB_URL=\"mysql+pymysql://root:why20030319@127.0.0.1:3306/aiops_monitor\" NODE_ROLE=web NODE_HOSTNAME=Node-Web-Tokyo python agent.py)",
+      "Bash(DB_URL=\"mysql+pymysql://root:why20030319@127.0.0.1:3306/aiops_monitor\" NODE_ROLE=storage NODE_HOSTNAME=Node-Storage-Frankfurt python agent.py)"
     ]
   }
 }

@@ -1,0 +1,10 @@
+frontend/
+__pycache__/
+*.pyc
+.env
+.git/
+logs/
+*.log
+monitor_log.csv
+*.db
+*.sqlite3
