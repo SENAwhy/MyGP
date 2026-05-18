@@ -8,7 +8,7 @@ class Settings:
     # 数据库
     DB_URL: str = os.getenv(
         "DB_URL",
-        "mysql+pymysql://root:your possword@127.0.0.1:3306/aiops_monitor",
+        "mysql+pymysql://root:why20030319@127.0.0.1:3306/aiops_monitor",
     )
 
     # JWT 认证

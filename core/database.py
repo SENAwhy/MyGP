@@ -55,6 +55,7 @@ class AlertHistory(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     rule_name = Column(String(100), comment="触发规则名称")
+    hostname = Column(String(50), default="", comment="节点名称")
     metric = Column(String(50), comment="触发指标")
     current_value = Column(Float, comment="当前值")
     threshold = Column(Float, comment="阈值")

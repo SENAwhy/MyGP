@@ -80,16 +80,33 @@ init_default_rules()
 
 # ==================== 静态文件 & 前端页面 ====================
 
-if os.path.isdir("static"):
+FRONTEND_DIST = "frontend/dist"
+FRONTEND_DIST_INDEX = os.path.join(FRONTEND_DIST, "index.html")
+
+if os.path.isdir(FRONTEND_DIST) and os.path.isfile(FRONTEND_DIST_INDEX):
+    # Production: serve built frontend from frontend/dist
+    assets_dir = os.path.join(FRONTEND_DIST, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend_assets")
+
+    @app.get("/")
+    async def root():
+        return FileResponse(FRONTEND_DIST_INDEX)
+
+elif os.path.isdir("static"):
+    # Legacy: serve CDN-based frontend
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
+    @app.get("/")
+    async def root():
+        if os.path.isfile("index.html"):
+            return FileResponse("index.html")
+        return {"message": "AIOps 监控大屏 API 服务运行中", "version": "2.0.0"}
+else:
 
-@app.get("/")
-def root():
-    """返回前端监控大屏页面"""
-    if os.path.isfile("index.html"):
-        return FileResponse("index.html")
-    return {"message": "AIOps 监控大屏 API 服务运行中", "version": "2.0.0"}
+    @app.get("/")
+    async def root():
+        return {"message": "AIOps 监控大屏 API 服务运行中", "version": "2.0.0"}
 
 
 # ==================== 认证接口 ====================

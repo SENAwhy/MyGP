@@ -63,6 +63,7 @@ class AlertEngine:
             if op_func(current_value, rule.threshold):
                 alert = {
                     "rule_name": rule.name,
+                    "hostname": metrics.get("hostname", ""),
                     "metric": rule.metric,
                     "current_value": current_value,
                     "threshold": rule.threshold,
@@ -87,6 +88,7 @@ class AlertEngine:
         try:
             record = AlertHistory(
                 rule_name=alert["rule_name"],
+                hostname=alert.get("hostname", ""),
                 metric=alert["metric"],
                 current_value=alert["current_value"],
                 threshold=alert["threshold"],
@@ -117,6 +119,7 @@ class AlertEngine:
                     {
                         "id": r.id,
                         "rule_name": r.rule_name,
+                        "hostname": r.hostname or "",
                         "metric": r.metric,
                         "current_value": r.current_value,
                         "threshold": r.threshold,

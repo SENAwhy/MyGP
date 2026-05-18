@@ -29,6 +29,10 @@ desktop.ini
 monitor_log.csv
 *.log
 
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
 # Database
 *.db
 *.sqlite3
