@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -9,7 +9,14 @@ import time
 import os
 
 from core.database import SessionLocal, User, SystemLog, init_default_rules
-from core.auth import verify_password, get_password_hash, create_access_token
+from core.auth import (
+    verify_password,
+    get_password_hash,
+    create_access_token,
+    oauth2_scheme,
+    get_current_user,
+    RequireRole,
+)
 from core.sys_monitor import (
     get_system_data,
     get_history_data,
@@ -56,8 +63,6 @@ async def global_exception_handler(request, exc):
         content={"status": "error", "detail": "服务器内部错误"},
     )
 
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 
 
 def init_admin():
@@ -137,7 +142,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @app.get("/api/system_status")
 def get_status(
     host: Optional[str] = None,
-    token: str = Depends(oauth2_scheme),
+    current_user: dict = Depends(get_current_user),
 ):
     global last_email_time
 
@@ -218,7 +223,7 @@ def get_history(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     metric: str = Query("all"),
-    token: str = Depends(oauth2_scheme),
+    current_user: dict = Depends(get_current_user),
 ):
     try:
         data = get_history_data(limit=limit, offset=offset, metric=metric)
@@ -228,7 +233,7 @@ def get_history(
 
 
 @app.get("/api/diagnose")
-def ai_diagnose(token: str = Depends(oauth2_scheme)):
+def ai_diagnose(current_user: dict = Depends(get_current_user)):
     sys_data = get_system_data()
     if not sys_data["top_processes"]:
         return {"status": "error", "report": "未抓取到进程数据"}
@@ -240,7 +245,7 @@ def ai_diagnose(token: str = Depends(oauth2_scheme)):
 # ==================== 系统信息接口 ====================
 
 @app.get("/api/system_info")
-def system_info(token: str = Depends(oauth2_scheme)):
+def system_info(current_user: dict = Depends(get_current_user)):
     """获取系统静态信息"""
     try:
         info = get_system_info()
@@ -253,7 +258,7 @@ def system_info(token: str = Depends(oauth2_scheme)):
 # ==================== 仪表盘摘要接口 ====================
 
 @app.get("/api/dashboard_summary")
-def dashboard_summary(token: str = Depends(oauth2_scheme)):
+def dashboard_summary(current_user: dict = Depends(get_current_user)):
     """获取仪表盘摘要统计"""
     try:
         summary = get_dashboard_summary()
@@ -268,14 +273,14 @@ def dashboard_summary(token: str = Depends(oauth2_scheme)):
 def get_alerts(
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    token: str = Depends(oauth2_scheme),
+    current_user: dict = Depends(get_current_user),
 ):
     """获取告警历史"""
     return alert_engine.get_alert_history(limit=limit, offset=offset)
 
 
 @app.get("/api/alert_rules")
-def get_alert_rules(token: str = Depends(oauth2_scheme)):
+def get_alert_rules(current_user: dict = Depends(get_current_user)):
     """获取告警规则列表"""
     rules = alert_engine.get_rules()
     return {"status": "success", "rules": rules}
@@ -285,9 +290,9 @@ def get_alert_rules(token: str = Depends(oauth2_scheme)):
 def toggle_alert_rule(
     rule_id: int,
     enabled: bool = Query(True),
-    token: str = Depends(oauth2_scheme),
+    current_user: dict = Depends(RequireRole("admin")),
 ):
-    """启用或禁用告警规则"""
+    """启用或禁用告警规则（需要管理员角色）"""
     ok = alert_engine.toggle_rule(rule_id, enabled)
     if ok:
         return {"status": "success", "message": f"规则 {rule_id} 已{'启用' if enabled else '禁用'}"}
@@ -297,7 +302,7 @@ def toggle_alert_rule(
 # ==================== AI 模型信息接口 ====================
 
 @app.get("/api/model_info")
-def model_info(token: str = Depends(oauth2_scheme)):
+def model_info(current_user: dict = Depends(get_current_user)):
     """获取 AI 异常检测模型的训练信息"""
     return {"status": "success", **ai_engine.get_model_info()}
 

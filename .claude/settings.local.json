@@ -30,7 +30,21 @@
       "Bash(NODE_ROLE=storage NODE_HOSTNAME=Node-Storage-Frankfurt python agent.py)",
       "Bash(DB_URL=\"mysql+pymysql://root:why20030319@127.0.0.1:3306/aiops_monitor\" NODE_ROLE=db NODE_HOSTNAME=Node-DB-Shanghai python agent.py)",
       "Bash(DB_URL=\"mysql+pymysql://root:why20030319@127.0.0.1:3306/aiops_monitor\" NODE_ROLE=web NODE_HOSTNAME=Node-Web-Tokyo python agent.py)",
-      "Bash(DB_URL=\"mysql+pymysql://root:why20030319@127.0.0.1:3306/aiops_monitor\" NODE_ROLE=storage NODE_HOSTNAME=Node-Storage-Frankfurt python agent.py)"
+      "Bash(DB_URL=\"mysql+pymysql://root:why20030319@127.0.0.1:3306/aiops_monitor\" NODE_ROLE=storage NODE_HOSTNAME=Node-Storage-Frankfurt python agent.py)",
+      "Bash(git *)",
+      "Bash(npx vite *)",
+      "Read(//c/Users/ASUS/AppData/Local/Temp/claude/E--GP/214d2aeb-0193-43de-87b8-f6062979bfc5/tasks/**)",
+      "Bash(docker-compose up *)",
+      "Bash(docker compose *)",
+      "Bash(where docker *)",
+      "Read(//c/Program Files/Docker/Docker/resources/bin/**)",
+      "Read(//c/Program Files/Docker/Docker/**)",
+      "Read(//mnt/c/Program Files/Docker/Docker/resources/bin/**)",
+      "Bash(winget install *)",
+      "Bash(wsl --status)",
+      "Bash(wsl *)",
+      "Bash(dism.exe /online /get-features /format:table)",
+      "Bash(powershell.exe *)"
     ]
   }
 }
