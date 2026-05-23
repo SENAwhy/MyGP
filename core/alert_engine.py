@@ -1,4 +1,5 @@
 import operator
+import time
 from datetime import datetime
 from core.database import SessionLocal, AlertRule, AlertHistory
 from core.logger import app_logger
@@ -20,12 +21,14 @@ class AlertEngine:
         self._rules_cache = []
         self._cache_time = None
         self._cache_ttl = 30
+        self._last_record_time: dict[str, float] = {}
+        self._record_cooldown = 300  # 同规则同主机 5 分钟内不重复入库
 
     def _load_rules(self):
         now = datetime.now()
         if (
             self._cache_time
-            and (now - self._cache_time).seconds < self._cache_ttl
+            and (now - self._cache_time).total_seconds() < self._cache_ttl
         ):
             return self._rules_cache
 
@@ -50,6 +53,8 @@ class AlertEngine:
         """
         rules = self._load_rules()
         triggered = []
+        now = time.time()
+        hostname = metrics.get("hostname", "")
 
         for rule in rules:
             op_func = self.OPERATORS.get(rule.operator)
@@ -63,7 +68,7 @@ class AlertEngine:
             if op_func(current_value, rule.threshold):
                 alert = {
                     "rule_name": rule.name,
-                    "hostname": metrics.get("hostname", ""),
+                    "hostname": hostname,
                     "metric": rule.metric,
                     "current_value": current_value,
                     "threshold": rule.threshold,
@@ -73,7 +78,12 @@ class AlertEngine:
                     ),
                 }
                 triggered.append(alert)
-                self._record_alert(alert)
+                # 去重：同规则+同主机在冷却期内不重复入库
+                dedup_key = f"{rule.name}:{hostname}:{rule.metric}"
+                last_time = self._last_record_time.get(dedup_key, 0)
+                if now - last_time > self._record_cooldown:
+                    self._record_alert(alert)
+                    self._last_record_time[dedup_key] = now
 
         if triggered:
             app_logger.warning(

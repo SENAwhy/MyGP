@@ -5,15 +5,15 @@ load_dotenv()
 
 
 class Settings:
-    # 数据库
+    # 数据库 — 默认值留空，强制从环境变量或 .env 读取
     DB_URL: str = os.getenv(
         "DB_URL",
-        "mysql+pymysql://root:why20030319@127.0.0.1:3306/aiops_monitor",
+        "",
     )
 
-    # JWT 认证
+    # JWT 认证 — 生产环境务必通过环境变量覆盖
     SECRET_KEY: str = os.getenv(
-        "SECRET_KEY", "AIOps_Max_Super_Secret_Key_2026"
+        "SECRET_KEY", ""
     )
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
@@ -46,3 +46,17 @@ class Settings:
 
 
 settings = Settings()
+
+# 启动时校验关键配置
+if not settings.SECRET_KEY:
+    import warnings
+    warnings.warn(
+        "SECRET_KEY 未配置！请通过环境变量或 .env 文件设置一个安全的密钥。",
+        RuntimeWarning,
+    )
+if not settings.DB_URL:
+    import warnings
+    warnings.warn(
+        "DB_URL 未配置！请通过环境变量或 .env 文件设置数据库连接。",
+        RuntimeWarning,
+    )

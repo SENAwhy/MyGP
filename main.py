@@ -7,6 +7,7 @@ from typing import Optional
 import threading
 import time
 import os
+import socket
 
 from core.database import SessionLocal, User, SystemLog, init_default_rules
 from core.auth import (
@@ -34,6 +35,7 @@ app = FastAPI(title="AIOps 监控大屏 Max", version="2.0.0")
 
 last_email_time = 0
 
+# CORS 配置 — 开发阶段允许所有源，生产环境请限制为前端域名
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -71,7 +73,7 @@ def init_admin():
     if not admin:
         new_admin = User(
             username="admin",
-            password_hash=get_password_hash("123456"),
+            password_hash=get_password_hash("admin123"),
             role="admin",
         )
         db.add(new_admin)
@@ -145,9 +147,10 @@ def get_status(
     current_user: dict = Depends(get_current_user),
 ):
     global last_email_time
+    local_hostname = socket.gethostname()
 
-    # 远程节点逻辑
-    if host and host != "" and "LAPTOP" not in str(host):
+    # 远程节点逻辑：host 非空且不是本地主机名
+    if host and host != "" and host != local_hostname:
         db = SessionLocal()
         log = (
             db.query(SystemLog)

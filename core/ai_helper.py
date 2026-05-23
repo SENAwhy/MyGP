@@ -44,7 +44,7 @@ def get_diagnose_report(process_name: str, cpu_percent: float) -> str:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            timeout=5,
+            timeout=30,
         )
         result = response.choices[0].message.content
         app_logger.info(f"DeepSeek 诊断完成: {result[:50]}...")

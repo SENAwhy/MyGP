@@ -10,7 +10,7 @@ import os
 import random
 import socket
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, text
 from sqlalchemy.orm import Session, declarative_base
 
 # ---- 配置 ----
@@ -77,7 +77,6 @@ def collect(engine):
     cpu = psutil.cpu_percent(interval=1)
     mem = psutil.virtual_memory().percent
     disk = psutil.disk_usage("/").percent
-    net = psutil.net_io_counters()
 
     # 网络速率在容器内通常很低，叠加一些模拟流量
     net_up = round(random.uniform(0.3, 4.0), 2)
@@ -108,11 +107,25 @@ def collect(engine):
     )
 
 
+def _mask_db_url(url: str) -> str:
+    """安全地脱敏数据库连接字符串中的密码。"""
+    try:
+        if "@" not in url:
+            return url
+        prefix, rest = url.split("@", 1)
+        if ":" in prefix:
+            parts = prefix.rsplit(":", 1)
+            return parts[0] + ":***@" + rest
+        return url
+    except Exception:
+        return "[无法解析的数据库URL]"
+
+
 def main():
     print(f"=== AIOps Agent 启动 ===")
     print(f"节点: {NODE_HOSTNAME}")
     print(f"角色: {ROLE}")
-    print(f"数据库: {DB_URL.replace(DB_URL.split('@')[0].split(':')[-1], '***')}")
+    print(f"数据库: {_mask_db_url(DB_URL)}")
     print()
 
     engine = create_engine(DB_URL, pool_pre_ping=True)
@@ -120,9 +133,7 @@ def main():
     # 验证数据库连接
     try:
         with engine.connect() as conn:
-            conn.execute(
-                __import__("sqlalchemy").text("SELECT 1")
-            )
+            conn.execute(text("SELECT 1"))
         print("数据库连接成功\n")
     except Exception as e:
         print(f"数据库连接失败: {e}")

@@ -3,8 +3,6 @@
  * 技术栈: Vue 3 (CDN) + ECharts 5
  */
 
-const API_BASE = "http://127.0.0.1:8000";
-
 const { createApp, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
 
 createApp({
@@ -21,7 +19,7 @@ createApp({
 
         // 导航
         const activeTab = ref("monitor");
-        const currentHost = ref("LAPTOP-33OCQVST");
+        const currentHost = ref("");
 
         // 实时数据
         const cpu = ref(0);
@@ -79,10 +77,13 @@ createApp({
         });
 
         const apiFetch = async (path, options = {}) => {
-            const url = `${API_BASE}${path}`;
+            // 合并 headers：优先使用 options.headers，但保留 Authorization
+            const optHeaders = options.headers || {};
+            const mergedHeaders = { ...getAuthHeaders(), ...optHeaders };
+            const url = `${path}`;
             const res = await fetch(url, {
-                headers: getAuthHeaders(),
                 ...options,
+                headers: mergedHeaders,
             });
             if (res.status === 401) {
                 doLogout();
@@ -100,7 +101,7 @@ createApp({
                 const formData = new URLSearchParams();
                 formData.append("username", loginUser.value);
                 formData.append("password", loginPass.value);
-                const response = await fetch(`${API_BASE}/api/login`, {
+                const response = await fetch(`/api/login`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/x-www-form-urlencoded",
@@ -236,9 +237,11 @@ createApp({
         const getData = async () => {
             if (!isLoggedIn.value || isHistoryMode.value) return;
             try {
-                const result = await apiFetch(
-                    `/api/system_status?host=${encodeURIComponent(currentHost.value)}`
-                );
+                let url = `/api/system_status`;
+                if (currentHost.value) {
+                    url += `?host=${encodeURIComponent(currentHost.value)}`;
+                }
+                const result = await apiFetch(url);
                 if (result.status === "success") {
                     cpu.value = result.cpu_usage;
                     memory.value = result.memory_usage;

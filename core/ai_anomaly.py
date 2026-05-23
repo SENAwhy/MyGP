@@ -27,30 +27,38 @@ class AnomalyDetector:
     def train_model(self):
         app_logger.info("正在从数据库读取历史数据进行无监督学习训练...")
         db = SessionLocal()
-        logs = (
-            db.query(SystemLog)
-            .order_by(SystemLog.id.desc())
-            .limit(500)
-            .all()
-        )
+        try:
+            logs = (
+                db.query(SystemLog)
+                .order_by(SystemLog.id.desc())
+                .limit(500)
+                .all()
+            )
+        except Exception as e:
+            app_logger.warning(f"数据库查询失败，模型暂不启动: {e}")
+            db.close()
+            return
         db.close()
 
         if len(logs) < 50:
             app_logger.warning(f"历史数据仅 {len(logs)} 条，模型暂不启动（需 >= 50）")
             return
 
-        data = [[log.cpu_usage, log.mem_usage] for log in logs]
-        df = pd.DataFrame(data, columns=["cpu", "mem"])
+        try:
+            data = [[log.cpu_usage, log.mem_usage] for log in logs]
+            df = pd.DataFrame(data, columns=["cpu", "mem"])
 
-        # 标准化后训练两个模型
-        scaled = self.scaler.fit_transform(df)
-        self.model.fit(scaled)
-        self.lof.fit(scaled)
-        self.is_trained = True
-        self.training_samples = len(logs)
-        app_logger.info(
-            f"双模型训练完成！孤立森林 + LOF 已建立基线，样本量: {self.training_samples}"
-        )
+            # 标准化后训练两个模型
+            scaled = self.scaler.fit_transform(df)
+            self.model.fit(scaled)
+            self.lof.fit(scaled)
+            self.is_trained = True
+            self.training_samples = len(logs)
+            app_logger.info(
+                f"双模型训练完成！孤立森林 + LOF 已建立基线，样本量: {self.training_samples}"
+            )
+        except Exception as e:
+            app_logger.error(f"模型训练失败: {e}")
 
     def detect(self, cpu: float, mem: float) -> bool:
         """综合双模型判断当前数据是否异常"""

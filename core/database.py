@@ -80,7 +80,10 @@ class SystemInfo(Base):
     last_updated = Column(DateTime, default=datetime.datetime.now)
 
 
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"警告：数据库表初始化失败（服务启动后可重试）: {e}")
 
 
 def save_to_mysql(data):

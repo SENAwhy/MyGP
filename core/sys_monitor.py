@@ -5,7 +5,8 @@ import os
 import socket
 import subprocess
 import platform
-from core.database import save_to_mysql, SessionLocal, SystemInfo
+from datetime import datetime
+from core.database import save_to_mysql, SessionLocal, SystemInfo, SystemLog
 from core.ai_anomaly import ai_engine
 from core.config import settings
 from core.logger import app_logger
@@ -13,24 +14,32 @@ from core.logger import app_logger
 last_net_io = psutil.net_io_counters()
 last_disk_io = psutil.disk_io_counters()
 last_time = time.time()
+_first_run = True  # 标记首次调用，需要重置基线
 LOG_FILE = settings.MONITOR_LOG_FILE
 psutil.cpu_percent(interval=None)
+
+
+def _reset_rate_baseline():
+    """重置网络/磁盘 IO 基线，避免长时间间隔导致速率计算偏差。"""
+    global last_net_io, last_disk_io, last_time
+    last_net_io = psutil.net_io_counters()
+    last_disk_io = psutil.disk_io_counters()
+    last_time = time.time()
 
 
 def _get_docker_stats() -> list[dict]:
     """尝试获取 Docker 容器状态（Docker 未安装时返回空列表）"""
     try:
+        creationflags = (
+            subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        )
         result = subprocess.run(
             [
                 "docker", "stats", "--no-stream",
                 "--format", "{{.Name}}|{{.CPUPerc}}|{{.MemPerc}}|{{.MemUsage}}",
             ],
             capture_output=True, text=True, timeout=5,
-            creationflags=(
-                subprocess.CREATE_NO_WINDOW
-                if os.name == "nt"
-                else 0
-            ),
+            creationflags=creationflags,
         )
         if result.returncode != 0:
             return []
@@ -56,7 +65,7 @@ def get_system_info() -> dict:
     """获取系统静态信息（操作系统、CPU型号、内存等）"""
     try:
         cpu_freq = psutil.cpu_freq()
-        boot_time = datetime_from_timestamp(psutil.boot_time())
+        boot_time = datetime.fromtimestamp(psutil.boot_time()).strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
         cpu_freq = None
         boot_time = "未知"
@@ -80,12 +89,6 @@ def get_system_info() -> dict:
     }
 
 
-def datetime_from_timestamp(ts: float) -> str:
-    """时间戳转可读时间字符串"""
-    import datetime
-    return datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
-
-
 def save_to_csv(data: dict):
     """将监控数据存入 CSV 文件"""
     file_exists = os.path.isfile(LOG_FILE)
@@ -103,9 +106,24 @@ def save_to_csv(data: dict):
         app_logger.error(f"CSV 写入失败: {e}")
 
 
+def _should_skip_pid(pid: int) -> bool:
+    """跨平台判断是否应跳过系统关键进程。"""
+    if os.name == "nt":
+        # Windows: System (4), System Idle Process (0)
+        return pid <= 4
+    else:
+        # Linux: init/systemd (1), kthreadd (2)
+        return pid <= 2
+
+
 def get_system_data() -> dict:
     """采集当前系统全部监控指标"""
-    global last_net_io, last_disk_io, last_time
+    global last_net_io, last_disk_io, last_time, _first_run
+
+    # 首次调用时重置基线，避免模块加载到首次调用之间的长时间偏差
+    if _first_run:
+        _reset_rate_baseline()
+        _first_run = False
 
     hostname = socket.gethostname()
     try:
@@ -158,7 +176,7 @@ def get_system_data() -> dict:
     processes = []
     for p in psutil.process_iter(["pid", "name", "cpu_percent", "exe", "memory_info"]):
         try:
-            if p.info["pid"] > 4:
+            if not _should_skip_pid(p.info["pid"]):
                 mem_mb = p.info["memory_info"].rss / 1024 / 1024
                 processes.append({
                     "pid": p.info["pid"],
@@ -212,17 +230,16 @@ def get_system_data() -> dict:
     return result_data
 
 
-def get_history_data(limit: int = 100, offset: int = 0, metric: str = "all") -> dict:
-    """读取历史监控数据，支持分页和指标筛选"""
+def _get_history_from_csv() -> list[dict]:
+    """从 CSV 文件读取历史数据。"""
     if not os.path.exists(LOG_FILE):
-        return {"total": 0, "items": []}
-
-    all_rows = []
+        return []
+    rows = []
     try:
         with open(LOG_FILE, mode="r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                all_rows.append({
+                rows.append({
                     "time": row.get("time", ""),
                     "cpu": float(row.get("cpu_usage", 0)),
                     "mem": float(row.get("memory_usage", 0)),
@@ -231,20 +248,60 @@ def get_history_data(limit: int = 100, offset: int = 0, metric: str = "all") -> 
                     "disk": float(row.get("disk_percent", 0)),
                     "swap": float(row.get("swap_percent", 0)),
                 })
-
-        total = len(all_rows)
-        items = all_rows[offset : offset + limit]
-
-        if metric != "all":
-            items = [
-                {"time": r["time"], metric: r[metric]}
-                for r in items
-            ]
-
-        return {"total": total, "items": items}
     except Exception as e:
-        app_logger.error(f"读取历史数据失败: {e}")
+        app_logger.error(f"读取 CSV 历史数据失败: {e}")
+    return rows
+
+
+def _get_history_from_mysql(limit: int = 100) -> list[dict]:
+    """从 MySQL 数据库读取历史数据（CSV 不可用时的后备）。"""
+    db = SessionLocal()
+    try:
+        logs = (
+            db.query(SystemLog)
+            .order_by(SystemLog.id.desc())
+            .limit(limit)
+            .all()
+        )
+        rows = []
+        for log in reversed(logs):
+            rows.append({
+                "time": log.log_time.strftime("%H:%M:%S") if log.log_time else "",
+                "cpu": log.cpu_usage or 0,
+                "mem": log.mem_usage or 0,
+                "net_up": log.net_upload or 0,
+                "net_down": log.net_download or 0,
+                "disk": log.disk_percent or 0,
+                "swap": 0,
+            })
+        return rows
+    except Exception as e:
+        app_logger.warning(f"从 MySQL 读取历史数据失败: {e}")
+        return []
+    finally:
+        db.close()
+
+
+def get_history_data(limit: int = 100, offset: int = 0, metric: str = "all") -> dict:
+    """读取历史监控数据，优先 CSV，后备 MySQL。"""
+    all_rows = _get_history_from_csv()
+    if not all_rows:
+        app_logger.info("CSV 无历史数据，尝试从 MySQL 读取...")
+        all_rows = _get_history_from_mysql(settings.HISTORY_LIMIT)
+
+    if not all_rows:
         return {"total": 0, "items": []}
+
+    total = len(all_rows)
+    items = all_rows[offset : offset + limit]
+
+    if metric != "all":
+        items = [
+            {"time": r["time"], metric: r[metric]}
+            for r in items
+        ]
+
+    return {"total": total, "items": items}
 
 
 def get_dashboard_summary() -> dict:
