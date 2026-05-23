@@ -3,7 +3,7 @@ defineProps({
   isDiagnosing: Boolean,
   reportData: String,
   isHistoryMode: Boolean,
-  currentHost: String,
+  isLocalNode: Boolean,
 })
 const emit = defineEmits(['generateReport'])
 </script>
@@ -11,7 +11,7 @@ const emit = defineEmits(['generateReport'])
 <template>
   <button
     class="btn-primary main-btn"
-    :disabled="isDiagnosing || isHistoryMode || currentHost !== 'LAPTOP-33OCQVST'"
+    :disabled="isDiagnosing || isHistoryMode || !isLocalNode"
     @click="emit('generateReport')"
   >
     {{ isDiagnosing ? 'DeepSeek 正在深度分析中...' : '一键生成 AI 报告 (仅限本地)' }}

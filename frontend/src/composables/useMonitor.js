@@ -2,7 +2,10 @@ import { ref, computed } from 'vue'
 import { apiFetch } from '@/api'
 
 // ---- Shared state (module-level = singleton across components) ----
-const currentHost = ref('LAPTOP-33OCQVST')
+const currentHost = ref('')
+const nodeList = ref([])
+const localHostname = ref('')
+const isLocalNode = computed(() => currentHost.value === localHostname.value && localHostname.value !== '')
 const cpu = ref(0)
 const memory = ref(0)
 const netUp = ref(0)
@@ -29,6 +32,23 @@ const diskData = []
 
 // Polling timer
 let monitorTimer = null
+
+// ---- Node list ----
+async function fetchNodes() {
+  try {
+    const result = await apiFetch('/api/nodes')
+    if (result.status === 'success') {
+      nodeList.value = result.nodes || []
+      localHostname.value = result.local || ''
+      // Auto-select local node on first load
+      if (!currentHost.value) {
+        currentHost.value = result.local || (result.nodes?.[0] || '')
+      }
+    }
+  } catch (_) {
+    // Fallback: keep empty, user sees no nodes until API works
+  }
+}
 
 export function useMonitor() {
   const isAlert = computed(() => cpu.value > 80 || memory.value > 90)
@@ -172,7 +192,8 @@ export function useMonitor() {
 
   return {
     // State
-    currentHost, cpu, memory, netUp, netDown, swapPercent, diskPercent,
+    currentHost, nodeList, localHostname, isLocalNode,
+    cpu, memory, netUp, netDown, swapPercent, diskPercent,
     diskRead, diskWrite, netConnections, topProcs, dockerContainers,
     hostname, localIp, isAiAnomaly, anomalyDetail, triggeredAlerts,
     isHistoryMode, isDiagnosing, reportData,
@@ -180,7 +201,7 @@ export function useMonitor() {
     // Computed
     isAlert,
     // Methods
-    getData, startPolling, stopPolling, switchHost, toggleHistory,
+    fetchNodes, getData, startPolling, stopPolling, switchHost, toggleHistory,
     pushChartData, chartSetOption,
     getAIReport, showDetail, requestNotifyPermission,
   }

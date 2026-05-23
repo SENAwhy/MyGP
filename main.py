@@ -73,7 +73,7 @@ def init_admin():
     if not admin:
         new_admin = User(
             username="admin",
-            password_hash=get_password_hash("admin123"),
+            password_hash=get_password_hash("123456"),
             role="admin",
         )
         db.add(new_admin)
@@ -118,7 +118,7 @@ else:
 
 # ==================== 认证接口 ====================
 
-@app.post("/api/login")
+@app.post("/api/login", tags=["认证"], summary="用户登录")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
     db = SessionLocal()
     user = (
@@ -141,7 +141,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 # ==================== 监控数据接口 ====================
 
-@app.get("/api/system_status")
+@app.get("/api/system_status", tags=["监控"], summary="获取实时系统状态")
 def get_status(
     host: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
@@ -221,7 +221,22 @@ def get_status(
     return {"status": "success", **data}
 
 
-@app.get("/api/history")
+@app.get("/api/nodes", tags=["监控"])
+def get_nodes(current_user: dict = Depends(get_current_user)):
+    """获取所有可用监控节点列表（去重），包含本地主机名标识"""
+    db = SessionLocal()
+    try:
+        hosts = db.query(SystemLog.hostname).distinct().all()
+        nodes = sorted({h[0] for h in hosts if h[0]})
+        local = socket.gethostname()
+        if local not in nodes:
+            nodes.insert(0, local)
+        return {"status": "success", "nodes": nodes, "local": local}
+    finally:
+        db.close()
+
+
+@app.get("/api/history", tags=["监控"], summary="获取历史监控数据")
 def get_history(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
@@ -235,7 +250,7 @@ def get_history(
         return {"status": "error", "message": str(e)}
 
 
-@app.get("/api/diagnose")
+@app.get("/api/diagnose", tags=["AI诊断"], summary="AI 智能诊断高负载进程")
 def ai_diagnose(current_user: dict = Depends(get_current_user)):
     sys_data = get_system_data()
     if not sys_data["top_processes"]:
@@ -247,7 +262,7 @@ def ai_diagnose(current_user: dict = Depends(get_current_user)):
 
 # ==================== 系统信息接口 ====================
 
-@app.get("/api/system_info")
+@app.get("/api/system_info", tags=["系统"], summary="获取系统静态信息")
 def system_info(current_user: dict = Depends(get_current_user)):
     """获取系统静态信息"""
     try:
@@ -260,7 +275,7 @@ def system_info(current_user: dict = Depends(get_current_user)):
 
 # ==================== 仪表盘摘要接口 ====================
 
-@app.get("/api/dashboard_summary")
+@app.get("/api/dashboard_summary", tags=["监控"], summary="获取仪表盘摘要统计")
 def dashboard_summary(current_user: dict = Depends(get_current_user)):
     """获取仪表盘摘要统计"""
     try:
@@ -272,7 +287,7 @@ def dashboard_summary(current_user: dict = Depends(get_current_user)):
 
 # ==================== 告警接口 ====================
 
-@app.get("/api/alerts")
+@app.get("/api/alerts", tags=["告警"], summary="获取告警历史记录")
 def get_alerts(
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
@@ -282,14 +297,14 @@ def get_alerts(
     return alert_engine.get_alert_history(limit=limit, offset=offset)
 
 
-@app.get("/api/alert_rules")
+@app.get("/api/alert_rules", tags=["告警"], summary="获取告警规则列表")
 def get_alert_rules(current_user: dict = Depends(get_current_user)):
     """获取告警规则列表"""
     rules = alert_engine.get_rules()
     return {"status": "success", "rules": rules}
 
 
-@app.put("/api/alert_rules/{rule_id}")
+@app.put("/api/alert_rules/{rule_id}", tags=["告警"], summary="启用/禁用告警规则")
 def toggle_alert_rule(
     rule_id: int,
     enabled: bool = Query(True),
@@ -304,7 +319,7 @@ def toggle_alert_rule(
 
 # ==================== AI 模型信息接口 ====================
 
-@app.get("/api/model_info")
+@app.get("/api/model_info", tags=["AI模型"], summary="获取 AI 异常检测模型训练信息")
 def model_info(current_user: dict = Depends(get_current_user)):
     """获取 AI 异常检测模型的训练信息"""
     return {"status": "success", **ai_engine.get_model_info()}

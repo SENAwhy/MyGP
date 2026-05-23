@@ -8,12 +8,13 @@ import DockerList from './DockerList.vue'
 import AiDiagnosis from './AiDiagnosis.vue'
 
 const {
-  currentHost, cpu, memory, netUp, netDown, swapPercent, diskPercent,
+  currentHost, nodeList, localHostname, isLocalNode,
+  cpu, memory, netUp, netDown, swapPercent, diskPercent,
   diskRead, diskWrite, netConnections, topProcs, dockerContainers,
   hostname, localIp, isAiAnomaly, triggeredAlerts,
   isHistoryMode, isDiagnosing, reportData,
   timeData, cpuData, memData, diskData,
-  getData, switchHost, toggleHistory,
+  fetchNodes, getData, switchHost, toggleHistory,
   getAIReport, showDetail, requestNotifyPermission,
 } = useMonitor()
 
@@ -54,7 +55,8 @@ function handleToggleHistory() {
   toggleHistory().then(() => doUpdateChart())
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await fetchNodes()
   startPolling()
 })
 
@@ -72,15 +74,14 @@ onUnmounted(() => {
       v-if="!isHistoryMode"
       @change="handleSwitchHost"
     >
-      <option value="LAPTOP-33OCQVST">节点 A：本地主机 (LAPTOP-33OCQVST)</option>
-      <option value="Node-DB-Shanghai">节点 B：数据库服务器 (Node-DB-Shanghai)</option>
-      <option value="Node-Web-Tokyo">节点 C：Web应用服务器 (Node-Web-Tokyo)</option>
-      <option value="Node-Storage-Frankfurt">节点 D：存储服务器 (Node-Storage-Frankfurt)</option>
+      <option v-for="node in nodeList" :key="node" :value="node">
+        {{ node === localHostname ? '本地主机' : '远程节点' }} ({{ node }})
+      </option>
     </select>
 
     <!-- AI anomaly banner -->
     <div
-      v-if="isAiAnomaly && currentHost === 'LAPTOP-33OCQVST' && !isHistoryMode"
+      v-if="isAiAnomaly && isLocalNode && !isHistoryMode"
       class="ai-banner"
     >
       [AI 双模型] 孤立森林 + LOF 检测到系统行为异常，请立即排查！
@@ -150,7 +151,7 @@ onUnmounted(() => {
       :is-diagnosing="isDiagnosing"
       :report-data="reportData"
       :is-history-mode="isHistoryMode"
-      :current-host="currentHost"
+      :is-local-node="isLocalNode"
       @generate-report="getAIReport"
     />
   </div>
